@@ -1,8 +1,31 @@
+#[macro_use]
+extern crate lazy_static;
+
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
     InputEmpty,
     InvalidPasswordLengthFound,
     NonEnglishWordFound,
+}
+
+struct EnglishDict {
+    words: std::collections::HashSet<String>,
+}
+
+impl EnglishDict {
+    fn load() -> Self {
+        Self {
+            words: input_helpers::read_lines("src/words_alpha.txt").collect(),
+        }
+    }
+
+    fn is_word(word: &str) -> bool {
+        lazy_static! {
+            static ref DICT: EnglishDict = EnglishDict::load();
+        }
+
+        DICT.words.contains(word)
+    }
 }
 
 fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValidationErr> {
@@ -11,9 +34,14 @@ fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValid
     }
 
     let required_len = pwds[0].len();
-    let equal_len = pwds.iter().all(|a| a.len() == required_len);
+    let equal_len = pwds.iter().all(|p| p.len() == required_len);
     if !equal_len {
         return Err(InputValidationErr::InvalidPasswordLengthFound);
+    }
+
+    let all_valid_words = pwds.iter().all(|p| EnglishDict::is_word(&p));
+    if !all_valid_words {
+        return Err(InputValidationErr::NonEnglishWordFound);
     }
 
     Ok(pwds)
@@ -79,6 +107,31 @@ mod tests {
             ])
             .unwrap_err(),
             InputValidationErr::InvalidPasswordLengthFound,
+        );
+    }
+
+    #[test]
+    fn check_input_validation_valid_words() {
+        let input_with_valid_words = vec![
+            String::from("apple"),
+            String::from("seeds"),
+            String::from("grape"),
+        ];
+
+        let input_with_invalid_words = vec![
+            String::from("apple"),
+            String::from("seedz"),
+            String::from("grape"),
+        ];
+
+        assert_eq!(
+            validate_input_passwords(input_with_valid_words.clone()).unwrap(),
+            input_with_valid_words,
+        );
+
+        assert_eq!(
+            validate_input_passwords(input_with_invalid_words).unwrap_err(),
+            InputValidationErr::NonEnglishWordFound,
         );
     }
 }
