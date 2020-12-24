@@ -1,0 +1,10 @@
+[package]
+name = "fonv_cracker"
+version = "0.1.0"
+authors = ["Scott Munro <scottnmunro@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+input_helpers = { path = "../advent-of-code/2020/input_helpers/" }
