@@ -115,6 +115,12 @@ fn main_2() {
         known_guesses
     };
 
+    for guess in &known_guesses {
+        if !input_passwords.contains(&guess.word) {
+            panic!("{} was not found in password list!", guess.word);
+        }
+    }
+
     let mut remaining_passwords = input_passwords.clone();
     for known_guess in &known_guesses {
         remaining_passwords = filter_matching_passwords(&known_guess, remaining_passwords);
@@ -126,7 +132,15 @@ fn main_2() {
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let file = &args[1];
-    let guesses = &args[2..];
+    let guesses = {
+        let mut guesses = Vec::new();
+        for (i, g) in args[2..].iter().enumerate() {
+            if i % 2 == 0 {
+                guesses.push(g.clone())
+            }
+        }
+        guesses
+    };
 
     let input_passwords = {
         let pwds: Vec<String> = input_helpers::read_lines(&file).collect();
@@ -136,7 +150,7 @@ fn main() {
         }
     };
 
-    for guess in guesses {
+    for guess in &guesses {
         if input_passwords.iter().filter(|l| *l == guess).count() != 1usize {
             panic!("{} was not found in password list!", guess);
         }
@@ -149,7 +163,7 @@ fn main() {
     println!("Matching {:?}... ", &guesses);
     for possible_password in possible_passwords {
         print!("    {} = ", possible_password);
-        for guess in guesses {
+        for guess in &guesses {
             let matching_count = possible_password
                 .chars()
                 .zip(guess.chars())
@@ -159,6 +173,11 @@ fn main() {
         }
         println!();
     }
+
+    println!();
+    println!();
+    println!();
+    main_2();
 }
 
 #[cfg(test)]
