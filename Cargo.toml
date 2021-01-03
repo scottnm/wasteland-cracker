@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 input_helpers = { path = "../advent-of-code/2020/input_helpers/" }
 lazy_static = "1.4.0"
+text_io = "0.1.8"

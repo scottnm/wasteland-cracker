@@ -83,15 +83,7 @@ where
     passwords
 }
 
-fn main_2() {
-    /*
-     * get list of words
-     * get set of known guesses
-     * for each known guess... {
-     *    remove any word which does not conform to each guess
-     *    keep track of the known guesses
-     * }
-     */
+fn main() {
     let file_arg: String = std::env::args().nth(1).unwrap();
     let input_passwords = {
         let pwds: Vec<String> = input_helpers::read_lines(&file_arg).collect();
@@ -101,7 +93,7 @@ fn main_2() {
         }
     };
 
-    let known_guesses = {
+    let mut known_guesses = {
         let mut known_guesses = Vec::new();
         let guess_args: Vec<String> = std::env::args().skip(2).collect();
         for guess_slice in guess_args.chunks(2) {
@@ -126,58 +118,29 @@ fn main_2() {
         remaining_passwords = filter_matching_passwords(&known_guess, remaining_passwords);
     }
 
-    dbg!(input_passwords, known_guesses, remaining_passwords);
-}
-
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let file = &args[1];
-    let guesses = {
-        let mut guesses = Vec::new();
-        for (i, g) in args[2..].iter().enumerate() {
-            if i % 2 == 0 {
-                guesses.push(g.clone())
-            }
+    while remaining_passwords.len() > 1 {
+        println!("Remaining passwords:");
+        for p in &remaining_passwords {
+            println!("    {}", p);
         }
-        guesses
-    };
 
-    let input_passwords = {
-        let pwds: Vec<String> = input_helpers::read_lines(&file).collect();
-        match validate_input_passwords(pwds) {
-            Ok(validated_pwds) => validated_pwds,
-            Err(e) => panic!("Input failed validation: {:?}", e),
+        let guess_word: String = text_io::read!("{}");
+        let guess_char_count: usize = text_io::read!("{}");
+        let next_guess = KnownGuess::new(&guess_word, guess_char_count);
+        if !remaining_passwords.contains(&next_guess.word) {
+            println!("{} was not found in password list!", next_guess.word);
+            continue;
         }
-    };
 
-    for guess in &guesses {
-        if input_passwords.iter().filter(|l| *l == guess).count() != 1usize {
-            panic!("{} was not found in password list!", guess);
-        }
+        remaining_passwords = filter_matching_passwords(&next_guess, remaining_passwords);
+        known_guesses.push(next_guess);
     }
 
-    let possible_passwords = input_passwords
-        .iter()
-        .filter(|l| guesses.iter().all(|g| *l != g));
-
-    println!("Matching {:?}... ", &guesses);
-    for possible_password in possible_passwords {
-        print!("    {} = ", possible_password);
-        for guess in &guesses {
-            let matching_count = possible_password
-                .chars()
-                .zip(guess.chars())
-                .filter(|(a, b)| a == b)
-                .count();
-            print!("{} ", matching_count);
-        }
-        println!();
-    }
-
-    println!();
-    println!();
-    println!();
-    main_2();
+    match &remaining_passwords[..] {
+        [] => println!("No solution matched the provided guesses!"),
+        [solution] => println!("The password is... {}", solution),
+        _ => (),
+    };
 }
 
 #[cfg(test)]
@@ -236,6 +199,6 @@ mod tests {
         let pwd_start = vec!["apple", "bppef", "elppa"];
         let pwd_remaining = vec!["bppef"];
 
-        assert_eq!(filter_matching_passwords(&guess, pwd_start), pwd_remaining)
+        assert_eq!(filter_matching_passwords(&guess, pwd_start), pwd_remaining);
     }
 }
