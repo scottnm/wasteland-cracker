@@ -53,9 +53,25 @@ struct KnownGuess {
     char_count: usize,
 }
 
-fn filter_matching_passwords(guess: &KnownGuess, mut passwords: Vec<String>) -> Vec<String> {
+impl KnownGuess {
+    fn new<S>(word: S, char_count: usize) -> Self
+    where
+        S: AsRef<str>,
+    {
+        KnownGuess {
+            word: String::from(word.as_ref()),
+            char_count,
+        }
+    }
+}
+
+fn filter_matching_passwords<S>(guess: &KnownGuess, mut passwords: Vec<S>) -> Vec<S>
+where
+    S: AsRef<str>,
+{
     for i in (0..passwords.len()).rev() {
         let matching_count = passwords[i]
+            .as_ref()
             .chars()
             .zip(guess.word.chars())
             .filter(|(a, b)| a == b)
@@ -91,10 +107,10 @@ fn main_2() {
         for guess_slice in guess_args.chunks(2) {
             let guess_word = &guess_slice[0];
             let guess_char_count = &guess_slice[1];
-            known_guesses.push(KnownGuess {
-                word: guess_word.clone(),
-                char_count: guess_char_count.parse().unwrap(),
-            });
+            known_guesses.push(KnownGuess::new(
+                guess_word,
+                guess_char_count.parse().unwrap(),
+            ));
         }
         known_guesses
     };
@@ -197,17 +213,9 @@ mod tests {
 
     #[test]
     fn check_filter_matching_passwords() {
-        let guess = KnownGuess {
-            word: String::from("apple"),
-            char_count: 2,
-        };
-
-        let pwd_start = vec!["apple", "bppef", "elppa"]
-            .iter()
-            .map(|w| String::from(*w))
-            .collect();
-
-        let pwd_remaining: Vec<String> = vec!["bppef"].iter().map(|w| String::from(*w)).collect();
+        let guess = KnownGuess::new("apple", 2);
+        let pwd_start = vec!["apple", "bppef", "elppa"];
+        let pwd_remaining = vec!["bppef"];
 
         assert_eq!(filter_matching_passwords(&guess, pwd_start), pwd_remaining)
     }
