@@ -47,6 +47,66 @@ fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValid
     Ok(pwds)
 }
 
+#[derive(Debug)]
+struct KnownGuess {
+    word: String,
+    char_count: usize,
+}
+
+fn filter_matching_passwords(guess: &KnownGuess, mut passwords: Vec<String>) -> Vec<String> {
+    for i in (0..passwords.len()).rev() {
+        let matching_count = passwords[i]
+            .chars()
+            .zip(guess.word.chars())
+            .filter(|(a, b)| a == b)
+            .count();
+        if matching_count != guess.char_count {
+            passwords.swap_remove(i);
+        }
+    }
+    passwords
+}
+
+fn main_2() {
+    /*
+     * get list of words
+     * get set of known guesses
+     * for each known guess... {
+     *    remove any word which does not conform to each guess
+     *    keep track of the known guesses
+     * }
+     */
+    let file_arg: String = std::env::args().nth(1).unwrap();
+    let input_passwords = {
+        let pwds: Vec<String> = input_helpers::read_lines(&file_arg).collect();
+        match validate_input_passwords(pwds) {
+            Ok(validated_pwds) => validated_pwds,
+            Err(e) => panic!("Input failed validation: {:?}", e),
+        }
+    };
+
+    let known_guesses = {
+        let mut known_guesses = Vec::new();
+        let guess_args: Vec<String> = std::env::args().skip(2).collect();
+        for guess_slice in guess_args.chunks(2) {
+            let guess_word = &guess_slice[0];
+            let guess_char_count = &guess_slice[1];
+            known_guesses.push(KnownGuess {
+                word: guess_word.clone(),
+                char_count: guess_char_count.parse().unwrap(),
+            });
+        }
+        known_guesses
+    };
+
+    let mut remaining_passwords = input_passwords.clone();
+    for known_guess in &known_guesses {
+        remaining_passwords = filter_matching_passwords(&known_guess, remaining_passwords);
+    }
+
+    dbg!(input_passwords, known_guesses, remaining_passwords);
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let file = &args[1];
@@ -133,5 +193,22 @@ mod tests {
             validate_input_passwords(input_with_invalid_words).unwrap_err(),
             InputValidationErr::NonEnglishWordFound,
         );
+    }
+
+    #[test]
+    fn check_filter_matching_passwords() {
+        let guess = KnownGuess {
+            word: String::from("apple"),
+            char_count: 2,
+        };
+
+        let pwd_start = vec!["apple", "bppef", "elppa"]
+            .iter()
+            .map(|w| String::from(*w))
+            .collect();
+
+        let pwd_remaining: Vec<String> = vec!["bppef"].iter().map(|w| String::from(*w)).collect();
+
+        assert_eq!(filter_matching_passwords(&guess, pwd_start), pwd_remaining)
     }
 }
