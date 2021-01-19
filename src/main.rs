@@ -6,7 +6,7 @@ extern crate snm_simple_file;
 enum InputValidationErr {
     InputEmpty,
     InvalidPasswordLengthFound,
-    NonEnglishWordFound,
+    PasswordNotFoundInEnglishDict,
 }
 
 struct EnglishDict {
@@ -42,7 +42,7 @@ fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValid
 
     let all_valid_words = pwds.iter().all(|p| EnglishDict::is_word(&p));
     if !all_valid_words {
-        return Err(InputValidationErr::NonEnglishWordFound);
+        return Err(InputValidationErr::PasswordNotFoundInEnglishDict);
     }
 
     Ok(pwds)
@@ -190,7 +190,7 @@ mod tests {
 
         assert_eq!(
             validate_input_passwords(input_with_invalid_words).unwrap_err(),
-            InputValidationErr::NonEnglishWordFound,
+            InputValidationErr::PasswordNotFoundInEnglishDict,
         );
     }
 
