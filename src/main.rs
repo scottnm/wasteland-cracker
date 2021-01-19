@@ -1,6 +1,7 @@
 extern crate snm_simple_file;
 
 mod dict;
+mod game;
 mod solver;
 
 #[derive(Debug)]
@@ -52,7 +53,7 @@ fn main() {
     };
 
     match args.mode {
-        Mode::Game => unimplemented!(),
+        Mode::Game => game::run_game(),
         Mode::Solver(input_password_file, known_guess_args) => {
             solver::solver(&input_password_file, &known_guess_args)
         }
