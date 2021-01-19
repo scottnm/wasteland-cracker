@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
+extern crate snm_simple_file;
 
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
@@ -15,7 +16,7 @@ struct EnglishDict {
 impl EnglishDict {
     fn load() -> Self {
         Self {
-            words: input_helpers::read_lines("src/words_alpha.txt").collect(),
+            words: snm_simple_file::read_lines("src/words_alpha.txt").collect(),
         }
     }
 
@@ -86,7 +87,7 @@ where
 fn main() {
     let file_arg: String = std::env::args().nth(1).unwrap();
     let input_passwords = {
-        let pwds: Vec<String> = input_helpers::read_lines(&file_arg).collect();
+        let pwds: Vec<String> = snm_simple_file::read_lines(&file_arg).collect();
         match validate_input_passwords(pwds) {
             Ok(validated_pwds) => validated_pwds,
             Err(e) => panic!("Input failed validation: {:?}", e),
