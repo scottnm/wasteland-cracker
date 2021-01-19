@@ -15,3 +15,21 @@ pub fn run_game() {
     window.refresh();
     std::thread::sleep(std::time::Duration::from_millis(1000));
 }
+
+// Work breakdown
+// - generate a set of words given a difficulty/length
+// - constrain the number of words generated to only as much as would fit in two panes
+// - select a word to be the solution word
+// - run a window-less gameloop which lets us input words and get back the results of "N matching chars to solution"
+// - setup the win-lose condition that you only have 4 guesses
+// - render two panes
+// - place the words throughout the pane w/ filler text that goes in between words
+// - add support for selecting between the words in the TUI and highlighting the current selection
+//      - mouse support?
+//      - keyboard support?
+// - add support for using that selection instead of text input to power the gameloop
+// - add an output pane which tells you the results of your current selection
+
+// extensions/flavor
+// - use appropriate font to give it a "fallout feel"
+// - SFX
