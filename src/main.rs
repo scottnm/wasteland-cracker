@@ -66,10 +66,9 @@ where
     passwords
 }
 
-fn main() {
-    let file_arg: String = std::env::args().nth(1).unwrap();
+fn solver(password_file: &str, guess_args: &[String]) {
     let input_passwords = {
-        let pwds: Vec<String> = snm_simple_file::read_lines(&file_arg).collect();
+        let pwds: Vec<String> = snm_simple_file::read_lines(&password_file).collect();
         match validate_input_passwords(pwds) {
             Ok(validated_pwds) => validated_pwds,
             Err(e) => panic!("Input failed validation: {:?}", e),
@@ -78,7 +77,6 @@ fn main() {
 
     let mut known_guesses = {
         let mut known_guesses = Vec::new();
-        let guess_args: Vec<String> = std::env::args().skip(2).collect();
         for guess_slice in guess_args.chunks(2) {
             let guess_word = &guess_slice[0];
             let guess_char_count = &guess_slice[1];
@@ -124,6 +122,62 @@ fn main() {
         [solution] => println!("The password is... {}", solution),
         _ => (),
     };
+}
+
+#[derive(Debug)]
+enum Mode {
+    Game,
+    Solver(String, Vec<String>),
+}
+
+#[derive(Debug)]
+struct CmdlineArgs {
+    mode: Mode,
+}
+
+fn parse_cmdline_args() -> Result<CmdlineArgs, &'static str> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.is_empty() {
+        return Err("Missing mode argument");
+    }
+
+    let mode_arg = &args[0];
+    let mode = match mode_arg.as_str() {
+        "--solver" => {
+            if args.len() < 2 {
+                return Err("Missing input file arg for solver mode");
+            }
+
+            let known_guess_args = args.iter().skip(2).map(|a| a.clone()).collect();
+            Mode::Solver(args[1].clone(), known_guess_args)
+        }
+        "--game" => Mode::Game,
+        _ => return Err("Invalid mode argument"),
+    };
+
+    Ok(CmdlineArgs { mode })
+}
+
+fn print_usage_and_exit(err_msg: &str) -> ! {
+    println!("USAGE:");
+    println!("    fonv_cracker.exe --solver input_file [guess matching_char_count]+");
+    println!("    fonv_cracker.exe --game");
+    println!("Input err: {}", err_msg);
+    std::process::exit(1);
+}
+
+fn main() {
+    let args = match parse_cmdline_args() {
+        Ok(parsed_args) => parsed_args,
+        Err(err_msg) => print_usage_and_exit(&err_msg),
+    };
+
+    match args.mode {
+        Mode::Game => unimplemented!(),
+        Mode::Solver(input_password_file, known_guess_args) => {
+            solver(&input_password_file, &known_guess_args)
+        }
+    }
 }
 
 #[cfg(test)]
