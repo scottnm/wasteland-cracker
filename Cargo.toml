@@ -8,5 +8,4 @@ edition = "2018"
 
 [dependencies]
 snm_simple_file = { git = "https://github.com/scottnm/snm_simple_file", branch = "main" }
-lazy_static = "1.4.0"
 text_io = "0.1.8"

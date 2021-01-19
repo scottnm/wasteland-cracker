@@ -1,32 +1,12 @@
-#[macro_use]
-extern crate lazy_static;
 extern crate snm_simple_file;
+
+mod dict;
 
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
     InputEmpty,
     InvalidPasswordLengthFound,
     PasswordNotFoundInEnglishDict,
-}
-
-struct EnglishDict {
-    words: std::collections::HashSet<String>,
-}
-
-impl EnglishDict {
-    fn load() -> Self {
-        Self {
-            words: snm_simple_file::read_lines("src/dict/words_alpha.txt").collect(),
-        }
-    }
-
-    fn is_word(word: &str) -> bool {
-        lazy_static! {
-            static ref DICT: EnglishDict = EnglishDict::load();
-        }
-
-        DICT.words.contains(word)
-    }
 }
 
 fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValidationErr> {
@@ -40,7 +20,9 @@ fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValid
         return Err(InputValidationErr::InvalidPasswordLengthFound);
     }
 
-    let all_valid_words = pwds.iter().all(|p| EnglishDict::is_word(&p));
+    let dict = dict::EnglishDictChunk::load(required_len);
+
+    let all_valid_words = pwds.iter().all(|p| dict.is_word(&p));
     if !all_valid_words {
         return Err(InputValidationErr::PasswordNotFoundInEnglishDict);
     }
