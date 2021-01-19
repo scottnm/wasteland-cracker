@@ -1,3 +1,4 @@
+extern crate pancurses;
 extern crate snm_simple_file;
 
 mod dict;
