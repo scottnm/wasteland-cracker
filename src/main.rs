@@ -16,7 +16,7 @@ struct EnglishDict {
 impl EnglishDict {
     fn load() -> Self {
         Self {
-            words: snm_simple_file::read_lines("src/words_alpha.txt").collect(),
+            words: snm_simple_file::read_lines("src/dict/words_alpha.txt").collect(),
         }
     }
 
