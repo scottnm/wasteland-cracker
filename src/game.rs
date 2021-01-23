@@ -108,6 +108,7 @@ pub fn run_game(difficulty: Difficulty) {
 }
 
 fn run_windowless_game(words: &[String], rng: &mut dyn RangeRng<usize>) {
+    // Select an answer
     let solution = select_rand(words, rng);
 
     println!("Solution: {}", solution);
@@ -116,31 +117,39 @@ fn run_windowless_game(words: &[String], rng: &mut dyn RangeRng<usize>) {
         println!("  {} ({}/{})", word, matching_char_count, solution.len());
     }
 
+    // On each game loop iteration...
     let mut remaining_guess_count = 4;
     while remaining_guess_count > 0 {
+        // Let the user provide a guess
         println!("\nGuess? ");
         let next_guess: String = text_io::read!("{}");
 
+        // Check for a win
         if &next_guess == solution {
-            println!("Correct!");
             break;
         }
 
+        // Validate the non-winning word in the guess list
+        // TODO: won't be necessary when they can only select from a preset set of words
         if !words.iter().any(|w| w.eq_ignore_ascii_case(&next_guess)) {
             println!("Not a word in the list!");
             continue;
         }
 
+        // Print the matching character count as a hint for the next guess
         let matching_char_count =
             crate::utils::matching_char_count_ignore_case(&solution, &next_guess);
 
         println!("{} / {} chars match!", matching_char_count, solution.len());
 
+        // let the user know how many attempts they have left
         remaining_guess_count -= 1;
         println!("{} attempts left", remaining_guess_count);
     }
 
-    if remaining_guess_count == 0 {
+    if remaining_guess_count > 0 {
+        println!("Correct!");
+    } else {
         println!("Failed!");
     }
 }
