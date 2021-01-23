@@ -104,10 +104,10 @@ pub fn run_game(difficulty: Difficulty) {
     }
 
     // now let's run a mock game_loop
-    run_windowless_game(&rand_words, &mut rng);
+    run_game_from_line_console(&rand_words, &mut rng);
 }
 
-fn run_windowless_game(words: &[String], rng: &mut dyn RangeRng<usize>) {
+fn run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
     // Select an answer
     let solution = select_rand(words, rng);
 
