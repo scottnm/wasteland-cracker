@@ -1,5 +1,6 @@
 use crate::dict;
-use crate::randwrapper::RangeRng;
+use crate::randwrapper::{RangeRng, ThreadRangeRng};
+use std::str::FromStr;
 
 const TITLE: &str = "FONV: Terminal Cracker";
 
@@ -10,6 +11,34 @@ pub enum Difficulty {
     Average,
     Hard,
     VeryHard,
+}
+
+impl FromStr for Difficulty {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("VeryEasy") || s.eq_ignore_ascii_case("VE") {
+            return Ok(Difficulty::VeryEasy);
+        }
+
+        if s.eq_ignore_ascii_case("Easy") || s.eq_ignore_ascii_case("E") {
+            return Ok(Difficulty::Easy);
+        }
+
+        if s.eq_ignore_ascii_case("Average") || s.eq_ignore_ascii_case("A") {
+            return Ok(Difficulty::Average);
+        }
+
+        if s.eq_ignore_ascii_case("Hard") || s.eq_ignore_ascii_case("H") {
+            return Ok(Difficulty::Hard);
+        }
+
+        if s.eq_ignore_ascii_case("VeryHard") || s.eq_ignore_ascii_case("VH") {
+            return Ok(Difficulty::VeryHard);
+        }
+
+        Err("Invalid difficulty string")
+    }
 }
 
 pub fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<String> {
@@ -29,7 +58,7 @@ pub fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> 
         .collect()
 }
 
-pub fn run_game() {
+pub fn run_game(difficulty: Difficulty) {
     // setup the window
     let window = pancurses::initscr();
     pancurses::noecho(); // prevent key inputs rendering to the screen
@@ -39,10 +68,19 @@ pub fn run_game() {
     window.nodelay(true); // don't block waiting for key inputs (we'll poll)
     window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
 
+    let mut rng = ThreadRangeRng::new();
+    let rand_words = generate_words(difficulty, &mut rng);
+
     // TODO just open a stub window for now. We'll write the game soon.
     window.clear();
+
+    window.mvaddstr(0, 0, format!("{:?}", difficulty));
+    for (i, rand_word) in rand_words.iter().enumerate() {
+        window.mvaddstr(i as i32 + 1, 0, rand_word);
+    }
+
     window.refresh();
-    std::thread::sleep(std::time::Duration::from_millis(1000));
+    std::thread::sleep(std::time::Duration::from_millis(3000));
 }
 
 // Work breakdown
