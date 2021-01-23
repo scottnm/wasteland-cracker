@@ -1,4 +1,4 @@
-use crate::randwrapper::RangeRng;
+use crate::randwrapper::{select_rand, RangeRng};
 
 // Each dict chunk represents all words of the same length from our src dict. This partitioning is a
 // quick optimization since the cracker game will only concern itself with words of the same length.
@@ -20,7 +20,6 @@ impl EnglishDictChunk {
     }
 
     pub fn get_random_word(&self, rng: &mut dyn RangeRng<usize>) -> String {
-        let word_index = rng.gen_range(0, self.word_set.len());
-        self.word_set[word_index].clone()
+        select_rand(&self.word_set, rng).clone()
     }
 }

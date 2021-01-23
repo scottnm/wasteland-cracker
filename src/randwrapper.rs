@@ -4,6 +4,11 @@ pub trait RangeRng<T: PartialOrd> {
     fn gen_range(&mut self, lower: T, upper: T) -> T;
 }
 
+pub fn select_rand<'a, T>(seq: &'a [T], rng: &mut dyn RangeRng<usize>) -> &'a T {
+    let index = rng.gen_range(0, seq.len());
+    &seq[index]
+}
+
 pub struct ThreadRangeRng {
     rng: rand::rngs::ThreadRng,
 }
