@@ -6,6 +6,7 @@ mod dict;
 mod game;
 mod randwrapper;
 mod solver;
+mod utils;
 
 #[derive(Debug)]
 enum Mode {
@@ -51,7 +52,7 @@ fn parse_cmdline_args() -> Result<CmdlineArgs, &'static str> {
 fn print_usage_and_exit(err_msg: &str) -> ! {
     println!("USAGE:");
     println!("    fonv_cracker.exe --solver input_file [guess matching_char_count]+");
-    println!("    fonv_cracker.exe --game");
+    println!("    fonv_cracker.exe --game difficulty");
     println!("Input err: {}", err_msg);
     std::process::exit(1);
 }

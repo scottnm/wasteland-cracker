@@ -51,12 +51,8 @@ where
     S: AsRef<str>,
 {
     for i in (0..passwords.len()).rev() {
-        let matching_count = passwords[i]
-            .as_ref()
-            .chars()
-            .zip(guess.word.chars())
-            .filter(|(a, b)| a == b)
-            .count();
+        let matching_count =
+            crate::utils::matching_char_count_ignore_case(passwords[i].as_ref(), &guess.word);
         if matching_count != guess.char_count {
             passwords.swap_remove(i);
         }

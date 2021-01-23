@@ -1,7 +1,6 @@
 // Work breakdown
 // - constrain the number of words generated to only as much as would fit in two panes
-// - select a word to be the solution word
-// - run a window-less gameloop which lets us input words and get back the results of "N matching chars to solution"
+// - setup a better word selection algorithm which results in more common letters
 // - setup the win-lose condition that you only have 4 guesses
 // - render two panes
 // - place the words throughout the pane w/ filler text that goes in between words
@@ -16,7 +15,7 @@
 // - SFX
 
 use crate::dict;
-use crate::randwrapper::{RangeRng, ThreadRangeRng};
+use crate::randwrapper::{select_rand, RangeRng, ThreadRangeRng};
 use std::str::FromStr;
 
 const TITLE: &str = "FONV: Terminal Cracker";
@@ -76,28 +75,83 @@ pub fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> 
 }
 
 pub fn run_game(difficulty: Difficulty) {
-    // setup the window
-    let window = pancurses::initscr();
-    pancurses::noecho(); // prevent key inputs rendering to the screen
-    pancurses::cbreak();
-    pancurses::curs_set(0);
-    pancurses::set_title(TITLE);
-    window.nodelay(true); // don't block waiting for key inputs (we'll poll)
-    window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
-
+    // Generate a random set of words based on the difficulty
     let mut rng = ThreadRangeRng::new();
     let rand_words = generate_words(difficulty, &mut rng);
 
-    // TODO just open a stub window for now. We'll write the game soon.
-    window.clear();
+    // For the sake of keeping the windowing around let's dump those words in a window
+    {
+        // setup the window
+        let window = pancurses::initscr();
+        pancurses::noecho(); // prevent key inputs rendering to the screen
+        pancurses::cbreak();
+        pancurses::curs_set(0);
+        pancurses::set_title(TITLE);
+        window.nodelay(true); // don't block waiting for key inputs (we'll poll)
+        window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
 
-    window.mvaddstr(0, 0, format!("{:?}", difficulty));
-    for (i, rand_word) in rand_words.iter().enumerate() {
-        window.mvaddstr(i as i32 + 1, 0, rand_word);
+        // TODO just open a stub window for now. We'll write the game soon.
+        window.clear();
+
+        window.mvaddstr(0, 0, format!("{:?}", difficulty));
+        for (i, rand_word) in rand_words.iter().enumerate() {
+            window.mvaddstr(i as i32 + 1, 0, rand_word);
+        }
+
+        window.refresh();
+        std::thread::sleep(std::time::Duration::from_millis(3000));
+        pancurses::endwin();
     }
 
-    window.refresh();
-    std::thread::sleep(std::time::Duration::from_millis(3000));
+    // now let's run a mock game_loop
+    run_game_from_line_console(&rand_words, &mut rng);
+}
+
+fn run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
+    // Select an answer
+    let solution = select_rand(words, rng);
+
+    println!("Solution: {}", solution);
+    for word in words {
+        let matching_char_count = crate::utils::matching_char_count_ignore_case(&solution, word);
+        println!("  {} ({}/{})", word, matching_char_count, solution.len());
+    }
+
+    // On each game loop iteration...
+    let mut remaining_guess_count = 4;
+    while remaining_guess_count > 0 {
+        // Let the user provide a guess
+        println!("\nGuess? ");
+        let next_guess: String = text_io::read!("{}");
+
+        // Check for a win
+        if &next_guess == solution {
+            break;
+        }
+
+        // Validate the non-winning word in the guess list
+        // TODO: won't be necessary when they can only select from a preset set of words
+        if !words.iter().any(|w| w.eq_ignore_ascii_case(&next_guess)) {
+            println!("Not a word in the list!");
+            continue;
+        }
+
+        // Print the matching character count as a hint for the next guess
+        let matching_char_count =
+            crate::utils::matching_char_count_ignore_case(&solution, &next_guess);
+
+        println!("{} / {} chars match!", matching_char_count, solution.len());
+
+        // let the user know how many attempts they have left
+        remaining_guess_count -= 1;
+        println!("{} attempts left", remaining_guess_count);
+    }
+
+    if remaining_guess_count > 0 {
+        println!("Correct!");
+    } else {
+        println!("Failed!");
+    }
 }
 
 #[cfg(test)]
