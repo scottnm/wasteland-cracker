@@ -100,7 +100,30 @@ fn render_hexdump_pane(
     mem_start: usize,
     bytes: &[char],
 ) {
-    unimplemented!();
+    for row in 0..hex_dump_dimensions.height() {
+        let memaddr = mem_start + (row * hex_dump_dimensions.dump_width) as usize;
+        let memaddr_str = format!(
+            "0x{:0width$X}",
+            memaddr,
+            width = (hex_dump_dimensions.addr_width as usize) - 2,
+        );
+
+        let byte_offset = (row * hex_dump_dimensions.dump_width) as usize;
+        let row_bytes =
+            &bytes[byte_offset..(byte_offset + hex_dump_dimensions.dump_width as usize)];
+
+        let y = row + render_rect.top;
+
+        // render the memaddr
+        window.mvaddstr(y, render_rect.left, &memaddr_str);
+
+        // render the dump
+        let hex_dump_bytes_offset =
+            render_rect.left + memaddr_str.len() as i32 + hex_dump_dimensions.addr_to_dump_padding;
+        for (i, byte) in row_bytes.iter().enumerate() {
+            window.mvaddch(y, hex_dump_bytes_offset + i as i32, *byte);
+        }
+    }
 }
 
 pub fn run_game(difficulty: Difficulty) {
@@ -128,15 +151,10 @@ pub fn run_game(difficulty: Difficulty) {
         const MEMADDR_HEX_WIDTH: i32 = "0x1234".len() as i32; // 2 byte memaddr
         const PANE_HORIZONTAL_PADDING: i32 = 4; // horizontal padding between panes in the memdump window
 
-        const HEXDUMP_PANE_WIDTH: i32 = MEMADDR_HEX_WIDTH
-            + PANE_HORIZONTAL_PADDING
-            + HEXDUMP_ROW_WIDTH
-            + (PANE_HORIZONTAL_PADDING / 2);
-
         const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
 
-        let (window_height, window_width) = window.get_max_yx();
-        let (window_center_x, window_center_y) = (window_width / 2, window_height / 2);
+        let window_width = window.get_max_x();
+        let window_center_x = window_width / 2;
 
         // are all of these constants only used by this struct?
         let hex_dump_pane_dimensions = HexDumpPane {
@@ -156,9 +174,7 @@ pub fn run_game(difficulty: Difficulty) {
         };
 
         let right_hex_dump_rect = Rect {
-            left: left_hex_dump_rect.left
-                + left_hex_dump_rect.width
-                + (PANE_HORIZONTAL_PADDING / 2),
+            left: window_center_x + (PANE_HORIZONTAL_PADDING / 2),
             top: left_hex_dump_rect.top,
             width: hex_dump_pane_dimensions.full_width(),
             height: hex_dump_pane_dimensions.height(),
