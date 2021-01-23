@@ -1,8 +1,10 @@
+use crate::randwrapper::RangeRng;
+
 // Each dict chunk represents all words of the same length from our src dict. This partitioning is a
 // quick optimization since the cracker game will only concern itself with words of the same length.
 pub struct EnglishDictChunk {
     word_len: usize,
-    word_set: std::collections::HashSet<String>,
+    word_set: Vec<String>,
 }
 
 impl EnglishDictChunk {
@@ -14,6 +16,11 @@ impl EnglishDictChunk {
 
     pub fn is_word(&self, word: &str) -> bool {
         assert_eq!(self.word_len, word.len());
-        self.word_set.contains(word)
+        self.word_set.iter().any(|word_in_set| word_in_set == word)
+    }
+
+    pub fn get_random_word(&self, rng: &mut dyn RangeRng<usize>) -> String {
+        let word_index = rng.gen_range(0, self.word_set.len());
+        self.word_set[word_index].clone()
     }
 }

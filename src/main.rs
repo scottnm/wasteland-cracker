@@ -1,13 +1,15 @@
 extern crate pancurses;
+extern crate rand;
 extern crate snm_simple_file;
 
 mod dict;
 mod game;
+mod randwrapper;
 mod solver;
 
 #[derive(Debug)]
 enum Mode {
-    Game,
+    Game(game::Difficulty),
     Solver(String, Vec<String>),
 }
 
@@ -32,7 +34,14 @@ fn parse_cmdline_args() -> Result<CmdlineArgs, &'static str> {
             let known_guess_args = args.iter().skip(2).map(|a| a.clone()).collect();
             Mode::Solver(args[1].clone(), known_guess_args)
         }
-        "--game" => Mode::Game,
+        "--game" => {
+            if args.len() < 2 {
+                return Err("Missing difficulty arg for game mode");
+            }
+
+            let parsed_difficulty = args[1].parse::<game::Difficulty>()?;
+            Mode::Game(parsed_difficulty)
+        }
         _ => return Err("Invalid mode argument"),
     };
 
@@ -54,7 +63,7 @@ fn main() {
     };
 
     match args.mode {
-        Mode::Game => game::run_game(),
+        Mode::Game(difficulty) => game::run_game(difficulty),
         Mode::Solver(input_password_file, known_guess_args) => {
             solver::solver(&input_password_file, &known_guess_args)
         }
