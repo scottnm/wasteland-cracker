@@ -1,4 +1,33 @@
+use crate::dict;
+use crate::randwrapper::RangeRng;
+
 const TITLE: &str = "FONV: Terminal Cracker";
+
+#[derive(Debug, Clone, Copy)]
+pub enum Difficulty {
+    VeryEasy,
+    Easy,
+    Average,
+    Hard,
+    VeryHard,
+}
+
+pub fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<String> {
+    let word_len = match difficulty {
+        Difficulty::VeryEasy => 4,
+        Difficulty::Easy => 6,
+        Difficulty::Average => 8,
+        Difficulty::Hard => 10,
+        Difficulty::VeryHard => 12,
+    };
+
+    const WORDS_TO_GENERATE_COUNT: usize = 16;
+
+    let dict_chunk = dict::EnglishDictChunk::load(word_len);
+    (0..WORDS_TO_GENERATE_COUNT)
+        .map(|_| dict_chunk.get_random_word(rng))
+        .collect()
+}
 
 pub fn run_game() {
     // setup the window
@@ -33,3 +62,45 @@ pub fn run_game() {
 // extensions/flavor
 // - use appropriate font to give it a "fallout feel"
 // - SFX
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::randwrapper;
+
+    #[test]
+    fn test_word_generation() {
+        let mut rng = randwrapper::mocks::SequenceRangeRng::new(&[0, 2, 4, 7]);
+        let tests = [
+            (Difficulty::VeryEasy, ["aahs", "aani", "abac", "abba"]),
+            (Difficulty::Easy, ["aahing", "aarrgh", "abacay", "abacot"]),
+            (
+                Difficulty::Average,
+                ["aardvark", "aaronite", "abacisci", "abacuses"],
+            ),
+            (
+                Difficulty::Hard,
+                ["aardwolves", "abalienate", "abandoning", "abaptistum"],
+            ),
+            (
+                Difficulty::VeryHard,
+                [
+                    "abalienating",
+                    "abandonments",
+                    "abbreviately",
+                    "abbreviatory",
+                ],
+            ),
+        ];
+
+        for (difficulty, expected_words) in &tests {
+            let generated_words = generate_words(*difficulty, &mut rng);
+            let expected_word_cnt = 16;
+            for i in 0..expected_word_cnt {
+                let generated_word = &generated_words[i];
+                let expected_word = expected_words[i % expected_words.len()];
+                assert_eq!(generated_word, expected_word);
+            }
+        }
+    }
+}

@@ -1,8 +1,10 @@
 extern crate pancurses;
+extern crate rand;
 extern crate snm_simple_file;
 
 mod dict;
 mod game;
+mod randwrapper;
 mod solver;
 
 #[derive(Debug)]
