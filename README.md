@@ -8,6 +8,10 @@ The plan is to extend it to also be able to play a clone of the cracking game.
 
 ## Game Demo Progress
 
+- [Add a mocked out game screen](https://github.com/scottnm/fonv-cracker/commit/1bcb410)
+
+![Mocked out game screen image](demo/03-game-screen-mock.png)
+
 - [Non-TUI version of game loop](https://github.com/scottnm/fonv-cracker/commit/93181fa)
 
 ![Animation of non-TUI game loop](demo/02-non-tui-game.gif)
