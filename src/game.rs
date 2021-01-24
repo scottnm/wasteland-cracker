@@ -1,7 +1,6 @@
 // Work breakdown
 // - constrain the number of words generated to only as much as would fit in two panes
 // - setup a better word selection algorithm which results in more common letters
-// - render two panes
 // - place the words throughout the pane w/ filler text that goes in between words
 // - add support for selecting between the words in the TUI and highlighting the current selection
 //      - mouse support?
@@ -85,7 +84,7 @@ fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<
         Difficulty::VeryHard => 12,
     };
 
-    const WORDS_TO_GENERATE_COUNT: usize = 16;
+    const WORDS_TO_GENERATE_COUNT: usize = 12;
 
     let dict_chunk = dict::EnglishDictChunk::load(word_len);
     (0..WORDS_TO_GENERATE_COUNT)
@@ -165,20 +164,30 @@ pub fn run_game(difficulty: Difficulty) {
         };
 
         let left_hex_dump_rect = Rect {
-            left: window_center_x
-                - hex_dump_pane_dimensions.full_width()
-                - (PANE_HORIZONTAL_PADDING / 2),
+            left: 0,
             top: HEXDUMP_PANE_VERT_OFFSET,
             width: hex_dump_pane_dimensions.full_width(),
             height: hex_dump_pane_dimensions.height(),
         };
 
         let right_hex_dump_rect = Rect {
-            left: window_center_x + (PANE_HORIZONTAL_PADDING / 2),
+            left: left_hex_dump_rect.width + hex_dump_pane_dimensions.addr_to_dump_padding,
             top: left_hex_dump_rect.top,
             width: hex_dump_pane_dimensions.full_width(),
             height: hex_dump_pane_dimensions.height(),
         };
+
+        window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
+        window.mvaddstr(1, 0, "ENTER PASSWORD NOW");
+        const BLOCK_CHAR: char = '#';
+        window.mvaddstr(
+            3,
+            0,
+            format!(
+                "# ATTEMPT(S) LEFT: {} {} {} {}",
+                BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR
+            ),
+        );
 
         let hexdump_temp_fill = vec!['x'; HEXDUMP_MAX_BYTES as usize];
         let hexdump_first_addr = 0x1234; // TODO: randomize for fun flavor
@@ -206,7 +215,7 @@ pub fn run_game(difficulty: Difficulty) {
         */
 
         window.refresh();
-        std::thread::sleep(std::time::Duration::from_millis(3000));
+        std::thread::sleep(std::time::Duration::from_millis(5000));
         pancurses::endwin();
     }
 
@@ -293,7 +302,7 @@ mod tests {
 
         for (difficulty, expected_words) in &tests {
             let generated_words = generate_words(*difficulty, &mut rng);
-            let expected_word_cnt = 16;
+            let expected_word_cnt = 12;
             for i in 0..expected_word_cnt {
                 let generated_word = &generated_words[i];
                 let expected_word = expected_words[i % expected_words.len()];
