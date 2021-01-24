@@ -97,7 +97,7 @@ fn render_hexdump_pane(
     hex_dump_dimensions: &HexDumpPane,
     render_rect: &Rect,
     mem_start: usize,
-    bytes: &[char],
+    bytes: &str,
 ) {
     for row in 0..hex_dump_dimensions.height() {
         let memaddr = mem_start + (row * hex_dump_dimensions.dump_width) as usize;
@@ -119,16 +119,36 @@ fn render_hexdump_pane(
         // render the dump
         let hex_dump_bytes_offset =
             render_rect.left + memaddr_str.len() as i32 + hex_dump_dimensions.addr_to_dump_padding;
-        for (i, byte) in row_bytes.iter().enumerate() {
-            window.mvaddch(y, hex_dump_bytes_offset + i as i32, *byte);
+        for (i, byte) in row_bytes.chars().enumerate() {
+            window.mvaddch(y, hex_dump_bytes_offset + i as i32, byte);
         }
     }
 }
 
+fn obfuscate_words(
+    words: &[String],
+    target_size: usize,
+    _rng: &mut dyn RangeRng<usize>,
+) -> (String, Vec<usize>) {
+    let tmp_string: String = std::iter::repeat('x').take(target_size).collect();
+    let offsets: Vec<usize> = words.iter().enumerate().map(|(i, _)| i).collect();
+    (tmp_string, offsets)
+}
+
 pub fn run_game(difficulty: Difficulty) {
+    const HEXDUMP_ROW_WIDTH: i32 = 12; // 12 characters per row of the hexdump
+    const HEXDUMP_MAX_ROWS: i32 = 16; // 16 rows of hex dump per dump pane
+    const HEXDUMP_MAX_BYTES: i32 = HEXDUMP_ROW_WIDTH * HEXDUMP_MAX_ROWS;
+    const MEMADDR_HEX_WIDTH: i32 = "0x1234".len() as i32; // 2 byte memaddr
+    const PANE_HORIZONTAL_PADDING: i32 = 4; // horizontal padding between panes in the memdump window
+
+    const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
+
     // Generate a random set of words based on the difficulty
     let mut rng = ThreadRangeRng::new();
     let rand_words = generate_words(difficulty, &mut rng);
+    let (obfuscated_words, word_offsets) =
+        obfuscate_words(&rand_words, HEXDUMP_MAX_BYTES as usize, &mut rng);
 
     // For the sake of keeping the windowing around let's dump those words in a window
     {
@@ -186,22 +206,21 @@ pub fn run_game(difficulty: Difficulty) {
             ),
         );
 
-        let hexdump_temp_fill = vec!['x'; HEXDUMP_MAX_BYTES as usize];
         let hexdump_first_addr = 0x1234; // TODO: randomize for fun flavor
         render_hexdump_pane(
             &window,
             &hex_dump_pane_dimensions,
             &left_hex_dump_rect,
             hexdump_first_addr,
-            &hexdump_temp_fill,
+            &obfuscated_words,
         );
 
         render_hexdump_pane(
             &window,
             &hex_dump_pane_dimensions,
             &right_hex_dump_rect,
-            hexdump_first_addr + hexdump_temp_fill.len(),
-            &hexdump_temp_fill,
+            hexdump_first_addr + obfuscated_words.len(),
+            &obfuscated_words[obfuscated_words.len()..],
         );
 
         /* TODO: render the words in the memdump
@@ -306,5 +325,12 @@ mod tests {
                 assert_eq!(generated_word, expected_word);
             }
         }
+    }
+
+    #[test]
+    fn test_obfuscate_words() {
+        let mut rng = ThreadRangeRng::new();
+        let words = ["apple", "orange", "banana"];
+        unimplemented!();
     }
 }

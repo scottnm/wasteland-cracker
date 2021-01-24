@@ -30,6 +30,7 @@ impl<T: PartialOrd + rand::distributions::uniform::SampleUniform> RangeRng<T> fo
 #[cfg(test)]
 pub mod mocks {
     use super::*;
+    use rand::SeedableRng;
 
     pub struct SingleValueRangeRng<T: PartialOrd + Copy> {
         value: T,
@@ -40,8 +41,12 @@ pub mod mocks {
         seq: Vec<T>,
     }
 
+    pub struct SeededRng {
+        rng: rand::rngs::SmallRng,
+    }
+
     impl<T: PartialOrd + Copy> SingleValueRangeRng<T> {
-        pub fn new(value: T) -> SingleValueRangeRng<T> {
+        pub fn new(value: T) -> Self {
             SingleValueRangeRng { value }
         }
     }
@@ -55,7 +60,7 @@ pub mod mocks {
     }
 
     impl<T: PartialOrd + Copy> SequenceRangeRng<T> {
-        pub fn new(value: &[T]) -> SequenceRangeRng<T> {
+        pub fn new(value: &[T]) -> Self {
             SequenceRangeRng {
                 next: 0,
                 seq: Vec::from(value),
@@ -71,6 +76,22 @@ pub mod mocks {
             assert!(lower <= value);
             assert!(upper > value);
             value
+        }
+    }
+
+    impl SeededRng {
+        pub fn new(seed: u64) -> Self {
+            SeededRng {
+                rng: rand::rngs::SmallRng::seed_from_u64(seed),
+            }
+        }
+
+        pub fn gen_range<T: PartialOrd + Copy + rand::distributions::uniform::SampleUniform>(
+            &mut self,
+            lower: T,
+            upper: T,
+        ) -> T {
+            self.rng.gen_range(lower, upper)
         }
     }
 }
@@ -99,6 +120,29 @@ mod tests {
         for _ in 1..10 {
             let next_value = gen_wrapper(&mut rng, 0, 100);
             assert_eq!(first_value, next_value);
+        }
+    }
+
+    #[test]
+    fn test_seedable() {
+        let seed: u64 = 127;
+        let mut rng = mocks::SeededRng::new(seed);
+        let mut other_rngs = [
+            mocks::SeededRng::new(seed),
+            mocks::SeededRng::new(seed),
+            mocks::SeededRng::new(seed),
+        ];
+
+        const TRIALS: usize = 16;
+        for _ in 0..TRIALS {
+            let next_val = rng.gen_range(0, 100);
+            let other_vals = other_rngs
+                .iter_mut()
+                .map(|other_rng| other_rng.gen_range(0, 100));
+
+            for other_val in other_vals {
+                assert_eq!(next_val, other_val);
+            }
         }
     }
 }
