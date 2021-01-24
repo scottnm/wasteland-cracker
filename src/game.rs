@@ -211,10 +211,29 @@ pub fn run_game(difficulty: Difficulty) {
 
     // Generate a random set of words based on the difficulty
     let mut rng = ThreadRangeRng::new();
-    let rand_words = generate_words(difficulty, &mut rng);
-    let (obfuscated_words, _word_offsets) =
-        obfuscate_words(&rand_words, HEX_DUMP_PANE.max_bytes_in_pane() * 2, &mut rng);
+    let words = generate_words(difficulty, &mut rng);
+    let (hex_dump, word_offsets) =
+        obfuscate_words(&words, HEX_DUMP_PANE.max_bytes_in_pane() * 2, &mut rng);
+    let (hex_dump_left_pane, hex_dump_right_pane) =
+        hex_dump.split_at(HEX_DUMP_PANE.max_bytes_in_pane());
     let hexdump_start_addr = rng.gen_range(0xCC00, 0xFFFF);
+
+    struct SelectedChunk {
+        pane_num: usize,
+        row_num: usize,
+        col_start: usize,
+        col_end: usize,
+        dirty: bool,
+    };
+
+    // initially select the first character in the row pane
+    let mut selected_chunk = SelectedChunk {
+        pane_num: 0,
+        row_num: 0,
+        col_start: 0,
+        col_end: 1,
+        dirty: true,
+    };
 
     // setup the window
     let window = pancurses::initscr();
@@ -224,7 +243,95 @@ pub fn run_game(difficulty: Difficulty) {
     pancurses::set_title(TITLE);
     window.nodelay(true); // don't block waiting for key inputs (we'll poll)
     window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
-    while window.getch() != Some(pancurses::Input::Character('q')) {
+
+    // TODO: refactor this loop for readability and testing
+    loop {
+        #[derive(PartialEq, Eq)]
+        enum InputCmd {
+            Movement(i32, i32),
+            Quit,
+        }
+
+        let input_cmd = match window.getch() {
+            Some(pancurses::Input::Character('w')) => Some(InputCmd::Movement(0, -1)),
+            Some(pancurses::Input::Character('a')) => Some(InputCmd::Movement(-1, 0)),
+            Some(pancurses::Input::Character('s')) => Some(InputCmd::Movement(0, 1)),
+            Some(pancurses::Input::Character('d')) => Some(InputCmd::Movement(1, 0)),
+            Some(pancurses::Input::Character('q')) => Some(InputCmd::Quit),
+            // TODO: handle entering in guesses... Some(pancurses::Input::Character('ENTER')) => (),
+            _ => None,
+        };
+
+        // Handle quitting early
+        if input_cmd == Some(InputCmd::Quit) {
+            break;
+        }
+
+        // Handle movement inputs
+        // If we detect an input which says we should move the cursor, update the selected chunk
+        if let Some(InputCmd::Movement(col_move, row_move)) = input_cmd {
+            let mut next_col = col_move + (selected_chunk.col_start as i32);
+            let mut next_row = row_move + (selected_chunk.row_num as i32);
+            let mut next_pane = selected_chunk.pane_num as i32;
+
+            if next_col >= HEX_DUMP_PANE.width() {
+                next_col = 0;
+                next_pane += 1;
+            } else if next_col < 0 {
+                next_col = HEX_DUMP_PANE.width() - 1;
+                next_pane -= 1;
+            }
+
+            if next_row >= HEX_DUMP_PANE.height() {
+                next_row = 0;
+            } else if next_row < 0 {
+                next_row = HEX_DUMP_PANE.height() - 1;
+            }
+
+            if next_pane >= 2 {
+                next_pane = 0;
+            } else if next_pane < 0 {
+                next_pane = 1;
+            }
+
+            selected_chunk = SelectedChunk {
+                pane_num: next_pane as usize,
+                row_num: next_row as usize,
+                col_start: next_col as usize,
+                col_end: next_col as usize + 1,
+                dirty: true,
+            };
+        }
+
+        // if we've moved (or just initialized) the chunk selection, we may need to refit it to select
+        // a whole word.
+        if selected_chunk.dirty {
+            // the index of the cursor in the contiguous hex dump memory span
+            let cursor_index = selected_chunk.pane_num * HEX_DUMP_PANE.max_bytes_in_pane()
+                + selected_chunk.row_num * HEX_DUMP_PANE.width() as usize
+                + selected_chunk.col_start;
+
+            // turn our list of words and word_offsets into a list of ranges where those words live
+            // in the contiguous hex dump memory span
+            let word_ranges = words
+                .iter()
+                .zip(word_offsets.iter())
+                .map(|(word, word_offset)| (*word_offset, word_offset + word.len()));
+            for word_range in word_ranges {
+                if cursor_index >= word_range.0 && cursor_index < word_range.1 {
+                    // if our cursor is on or in the middle of a full word, update the cursor selection
+                    // to highlight the whole word
+                    let word_len = word_range.1 - word_range.0;
+                    let cursor_offset = cursor_index - word_range.0;
+                    selected_chunk.col_start -= cursor_offset;
+                    selected_chunk.col_end = selected_chunk.col_start + word_len;
+                    break;
+                }
+            }
+
+            selected_chunk.dirty = false;
+        }
+
         window.clear();
 
         // Render the hex dump header
@@ -246,7 +353,7 @@ pub fn run_game(difficulty: Difficulty) {
             &HEX_DUMP_PANE,
             &left_hex_dump_rect,
             hexdump_start_addr,
-            &obfuscated_words,
+            &hex_dump_left_pane,
         );
 
         // Render the right hex dump pane
@@ -254,8 +361,8 @@ pub fn run_game(difficulty: Difficulty) {
             &window,
             &HEX_DUMP_PANE,
             &right_hex_dump_rect,
-            hexdump_start_addr + HEX_DUMP_PANE.max_bytes_in_pane(),
-            &obfuscated_words[HEX_DUMP_PANE.max_bytes_in_pane()..],
+            hexdump_start_addr + hex_dump_left_pane.len(),
+            &hex_dump_right_pane,
         );
 
         window.refresh();
@@ -266,7 +373,7 @@ pub fn run_game(difficulty: Difficulty) {
     pancurses::endwin();
 
     // now let's run a mock game_loop
-    // run_game_from_line_console(&rand_words, &mut rng);
+    // run_game_from_line_console(&words, &mut rng);
 }
 
 fn _run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
