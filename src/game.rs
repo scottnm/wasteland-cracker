@@ -1,7 +1,5 @@
 // Work breakdown
-// - constrain the number of words generated to only as much as would fit in two panes
 // - setup a better word selection algorithm which results in more common letters
-// - place the words throughout the pane w/ filler text that goes in between words
 // - add support for selecting between the words in the TUI and highlighting the current selection
 //      - mouse support?
 //      - keyboard support?
