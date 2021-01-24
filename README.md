@@ -8,6 +8,10 @@ The plan is to extend it to also be able to play a clone of the cracking game.
 
 ## Game Demo Progress
 
+- [Fill in hex dump screen with selected words and memory noise](https://github.com/scottnm/fonv-cracker/commit/108b30f)
+
+![Game screen with random words and memory noise in hex dump view](demo/04-fill-in-words.png)
+
 - [Add a mocked out game screen](https://github.com/scottnm/fonv-cracker/commit/1bcb410)
 
 ![Mocked out game screen image](demo/03-game-screen-mock.png)
