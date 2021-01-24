@@ -152,9 +152,6 @@ pub fn run_game(difficulty: Difficulty) {
 
         const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
 
-        let window_width = window.get_max_x();
-        let window_center_x = window_width / 2;
-
         // are all of these constants only used by this struct?
         let hex_dump_pane_dimensions = HexDumpPane {
             dump_width: HEXDUMP_ROW_WIDTH,
