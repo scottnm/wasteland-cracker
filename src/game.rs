@@ -108,8 +108,7 @@ fn render_hexdump_pane(
         );
 
         let byte_offset = (row * hex_dump_dimensions.dump_width) as usize;
-        let row_bytes =
-            &bytes[byte_offset..(byte_offset + hex_dump_dimensions.dump_width as usize)];
+        let row_bytes = &bytes[byte_offset..][..hex_dump_dimensions.dump_width as usize];
 
         let y = row + render_rect.top;
 
@@ -128,11 +127,50 @@ fn render_hexdump_pane(
 fn obfuscate_words(
     words: &[String],
     target_size: usize,
-    _rng: &mut dyn RangeRng<usize>,
+    rng: &mut dyn RangeRng<usize>,
 ) -> (String, Vec<usize>) {
-    let tmp_string: String = std::iter::repeat('x').take(target_size).collect();
-    let offsets: Vec<usize> = words.iter().enumerate().map(|(i, _)| i).collect();
-    (tmp_string, offsets)
+    let initial_length_from_words: usize = words.iter().fold(0, |acc, word| acc + word.len());
+    let remaining_char_count_to_generate = target_size - initial_length_from_words;
+
+    // place the words at offsets within the final obfuscated string such that filling in between/around
+    // those words will generate the final obfuscated string
+    let offsets = {
+        let mut offsets = Vec::new();
+        for word in words.iter().rev() {
+            offsets.push(0);
+            for offset in offsets.iter_mut() {
+                *offset += word.len();
+            }
+        }
+
+        for _ in 0..remaining_char_count_to_generate {
+            // Increment each offset starting from a random offset.
+            // This simulates adding a character before a random word in the final obfuscated string
+            // e.g. if offsets_to_bump_start = 1, then a character is added between words 0 and 1
+            // and words 1->onward are then offset by an additional character.
+            let offsets_to_bump_start = rng.gen_range(0, offsets.len() + 1);
+
+            for i in offsets_to_bump_start..offsets.len() {
+                offsets[i] += 1;
+            }
+        }
+        offsets
+    };
+
+    let mut string_builder = String::with_capacity(target_size);
+
+    // fill the string with the initial garbage chars
+    for _ in 0..remaining_char_count_to_generate {
+        let garbage_char = rng.gen_range('#' as usize, '.' as usize) as u8 as char;
+        string_builder.push(garbage_char);
+    }
+
+    // insert each of the offset words
+    for (word, offset) in words.iter().zip(offsets.iter()) {
+        string_builder.insert_str(*offset, &word);
+    }
+
+    (string_builder, offsets)
 }
 
 pub fn run_game(difficulty: Difficulty) {
