@@ -8,7 +8,6 @@
 // - add support for using that selection instead of text input to power the gameloop
 // - add an output pane which tells you the results of your current selection
 // - refactor out tui utils into its own module
-// - randomize the hex start address for fun flavor
 
 // extensions/flavor
 // - use appropriate font to give it a "fallout feel"
@@ -38,12 +37,28 @@ struct HexDumpPane {
 }
 
 impl HexDumpPane {
-    fn height(&self) -> i32 {
+    const fn width(&self) -> i32 {
+        self.dump_width
+    }
+
+    const fn height(&self) -> i32 {
         self.dump_height
     }
 
-    fn full_width(&self) -> i32 {
+    const fn max_bytes_in_pane(&self) -> usize {
+        (self.dump_width * self.dump_height) as usize
+    }
+
+    const fn full_width(&self) -> i32 {
         self.dump_width + self.addr_to_dump_padding + self.addr_width
+    }
+
+    const fn addr_width(&self) -> usize {
+        self.addr_width as usize
+    }
+
+    const fn padding(&self) -> i32 {
+        self.addr_to_dump_padding
     }
 }
 
@@ -97,38 +112,96 @@ fn render_hexdump_pane(
     hex_dump_dimensions: &HexDumpPane,
     render_rect: &Rect,
     mem_start: usize,
-    bytes: &[char],
+    bytes: &str,
 ) {
     for row in 0..hex_dump_dimensions.height() {
-        let memaddr = mem_start + (row * hex_dump_dimensions.dump_width) as usize;
-        let memaddr_str = format!(
+        let byte_offset = (row * hex_dump_dimensions.width()) as usize;
+        let mem_addr = format!(
             "0x{:0width$X}",
-            memaddr,
-            width = (hex_dump_dimensions.addr_width as usize) - 2,
+            mem_start + byte_offset,
+            width = hex_dump_dimensions.addr_width() - 2,
         );
 
-        let byte_offset = (row * hex_dump_dimensions.dump_width) as usize;
-        let row_bytes =
-            &bytes[byte_offset..(byte_offset + hex_dump_dimensions.dump_width as usize)];
+        let row_bytes = &bytes[byte_offset..][..hex_dump_dimensions.width() as usize];
 
         let y = row + render_rect.top;
 
         // render the memaddr
-        window.mvaddstr(y, render_rect.left, &memaddr_str);
+        window.mvaddstr(y, render_rect.left, &mem_addr);
 
         // render the dump
-        let hex_dump_bytes_offset =
-            render_rect.left + memaddr_str.len() as i32 + hex_dump_dimensions.addr_to_dump_padding;
-        for (i, byte) in row_bytes.iter().enumerate() {
-            window.mvaddch(y, hex_dump_bytes_offset + i as i32, *byte);
-        }
+        window.mvaddstr(
+            y,
+            render_rect.left + mem_addr.len() as i32 + hex_dump_dimensions.padding(),
+            row_bytes,
+        );
     }
 }
 
+fn obfuscate_words(
+    words: &[String],
+    target_size: usize,
+    rng: &mut dyn RangeRng<usize>,
+) -> (String, Vec<usize>) {
+    let initial_length_from_words: usize = words.iter().fold(0, |acc, word| acc + word.len());
+    let remaining_char_count_to_generate = target_size - initial_length_from_words;
+
+    // place the words at offsets within the final obfuscated string such that filling in between/around
+    // those words will generate the final obfuscated string
+    let offsets = {
+        let mut offsets = Vec::new();
+        for word in words.iter() {
+            for offset in offsets.iter_mut() {
+                *offset += word.len();
+            }
+            offsets.insert(0, 0);
+        }
+
+        for _ in 0..remaining_char_count_to_generate {
+            // Increment each offset starting from a random offset.
+            // This simulates adding a character before a random word in the final obfuscated string
+            // e.g. if offsets_to_bump_start = 1, then a character is added between words 0 and 1
+            // and words 1->onward are then offset by an additional character.
+            let offsets_to_bump_start = rng.gen_range(0, offsets.len() + 1);
+
+            for i in offsets_to_bump_start..offsets.len() {
+                offsets[i] += 1;
+            }
+        }
+        offsets
+    };
+
+    let mut string_builder = String::with_capacity(target_size);
+
+    // fill the string with the initial garbage chars
+    for _ in 0..remaining_char_count_to_generate {
+        let garbage_char = rng.gen_range('#' as usize, '.' as usize) as u8 as char;
+        string_builder.push(garbage_char);
+    }
+
+    // insert each of the offset words
+    for (word, offset) in words.iter().zip(offsets.iter()) {
+        string_builder.insert_str(*offset, &word);
+    }
+
+    (string_builder, offsets)
+}
+
 pub fn run_game(difficulty: Difficulty) {
+    const HEX_DUMP_PANE: HexDumpPane = HexDumpPane {
+        dump_width: 12,                    // 12 characters per row of the hexdump
+        dump_height: 16,                   // 16 rows of hex dump per dump pane
+        addr_width: "0x1234".len() as i32, // 2 byte memaddr
+        addr_to_dump_padding: 4,           // horizontal padding between panes in the memdump window
+    };
+
+    const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
+
     // Generate a random set of words based on the difficulty
     let mut rng = ThreadRangeRng::new();
     let rand_words = generate_words(difficulty, &mut rng);
+    let (obfuscated_words, _word_offsets) =
+        obfuscate_words(&rand_words, HEX_DUMP_PANE.max_bytes_in_pane() * 2, &mut rng);
 
     // For the sake of keeping the windowing around let's dump those words in a window
     {
@@ -144,34 +217,19 @@ pub fn run_game(difficulty: Difficulty) {
         // TODO just open a stub window for now. We'll write the game soon.
         window.clear();
 
-        const HEXDUMP_ROW_WIDTH: i32 = 12; // 12 characters per row of the hexdump
-        const HEXDUMP_MAX_ROWS: i32 = 16; // 16 rows of hex dump per dump pane
-        const HEXDUMP_MAX_BYTES: i32 = HEXDUMP_ROW_WIDTH * HEXDUMP_MAX_ROWS;
-        const MEMADDR_HEX_WIDTH: i32 = "0x1234".len() as i32; // 2 byte memaddr
-        const PANE_HORIZONTAL_PADDING: i32 = 4; // horizontal padding between panes in the memdump window
-
-        const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
-
         // are all of these constants only used by this struct?
-        let hex_dump_pane_dimensions = HexDumpPane {
-            dump_width: HEXDUMP_ROW_WIDTH,
-            dump_height: HEXDUMP_MAX_ROWS,
-            addr_width: MEMADDR_HEX_WIDTH,
-            addr_to_dump_padding: PANE_HORIZONTAL_PADDING,
-        };
-
         let left_hex_dump_rect = Rect {
             left: 0,
             top: HEXDUMP_PANE_VERT_OFFSET,
-            width: hex_dump_pane_dimensions.full_width(),
-            height: hex_dump_pane_dimensions.height(),
+            width: HEX_DUMP_PANE.full_width(),
+            height: HEX_DUMP_PANE.height(),
         };
 
         let right_hex_dump_rect = Rect {
-            left: left_hex_dump_rect.width + hex_dump_pane_dimensions.addr_to_dump_padding,
+            left: left_hex_dump_rect.width + HEX_DUMP_PANE.padding(),
             top: left_hex_dump_rect.top,
-            width: hex_dump_pane_dimensions.full_width(),
-            height: hex_dump_pane_dimensions.height(),
+            width: HEX_DUMP_PANE.full_width(),
+            height: HEX_DUMP_PANE.height(),
         };
 
         window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
@@ -186,22 +244,21 @@ pub fn run_game(difficulty: Difficulty) {
             ),
         );
 
-        let hexdump_temp_fill = vec!['x'; HEXDUMP_MAX_BYTES as usize];
-        let hexdump_first_addr = 0x1234; // TODO: randomize for fun flavor
+        let hexdump_first_addr = rng.gen_range(0xCC00, 0xFFFF);
         render_hexdump_pane(
             &window,
-            &hex_dump_pane_dimensions,
+            &HEX_DUMP_PANE,
             &left_hex_dump_rect,
             hexdump_first_addr,
-            &hexdump_temp_fill,
+            &obfuscated_words,
         );
 
         render_hexdump_pane(
             &window,
-            &hex_dump_pane_dimensions,
+            &HEX_DUMP_PANE,
             &right_hex_dump_rect,
-            hexdump_first_addr + hexdump_temp_fill.len(),
-            &hexdump_temp_fill,
+            hexdump_first_addr + HEX_DUMP_PANE.max_bytes_in_pane(),
+            &obfuscated_words[HEX_DUMP_PANE.max_bytes_in_pane()..],
         );
 
         /* TODO: render the words in the memdump
@@ -217,10 +274,10 @@ pub fn run_game(difficulty: Difficulty) {
     }
 
     // now let's run a mock game_loop
-    run_game_from_line_console(&rand_words, &mut rng);
+    // run_game_from_line_console(&rand_words, &mut rng);
 }
 
-fn run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
+fn _run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
     // Select an answer
     let solution = select_rand(words, rng);
 
@@ -305,6 +362,24 @@ mod tests {
                 let expected_word = expected_words[i % expected_words.len()];
                 assert_eq!(generated_word, expected_word);
             }
+        }
+    }
+
+    #[test]
+    fn test_obfuscate_words() {
+        let mut rng = ThreadRangeRng::new();
+        let words: Vec<String> = ["apple", "orange", "banana"]
+            .iter()
+            .map(|s| String::from(*s))
+            .collect();
+
+        const HEX_BYTE_COUNT: usize = 100;
+        let (obfuscated_words, offsets) = obfuscate_words(&words, HEX_BYTE_COUNT, &mut rng);
+
+        assert_eq!(HEX_BYTE_COUNT, obfuscated_words.len());
+        for (word, word_offset) in words.iter().zip(offsets.iter()) {
+            let word_in_blob = &obfuscated_words[*word_offset..][..word.len()];
+            assert_eq!(word, word_in_blob);
         }
     }
 }
