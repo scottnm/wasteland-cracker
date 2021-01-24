@@ -330,7 +330,18 @@ mod tests {
     #[test]
     fn test_obfuscate_words() {
         let mut rng = ThreadRangeRng::new();
-        let words = ["apple", "orange", "banana"];
-        unimplemented!();
+        let words: Vec<String> = ["apple", "orange", "banana"]
+            .iter()
+            .map(|s| String::from(*s))
+            .collect();
+
+        const HEX_BYTE_COUNT: usize = 100;
+        let (obfuscated_words, offsets) = obfuscate_words(&words, HEX_BYTE_COUNT, &mut rng);
+
+        assert_eq!(HEX_BYTE_COUNT, obfuscated_words.len());
+        for (word, word_offset) in words.iter().zip(offsets.iter()) {
+            let word_in_blob = &obfuscated_words[*word_offset..][..word.len()];
+            assert_eq!(word, word_in_blob);
+        }
     }
 }
