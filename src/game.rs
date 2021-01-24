@@ -8,7 +8,6 @@
 // - add support for using that selection instead of text input to power the gameloop
 // - add an output pane which tells you the results of your current selection
 // - refactor out tui utils into its own module
-// - randomize the hex start address for fun flavor
 
 // extensions/flavor
 // - use appropriate font to give it a "fallout feel"
@@ -115,7 +114,6 @@ fn render_hexdump_pane(
     mem_start: usize,
     bytes: &str,
 ) {
-    dbg!(mem_start);
     for row in 0..hex_dump_dimensions.height() {
         let memaddr = mem_start + (row * hex_dump_dimensions.width()) as usize;
         let memaddr_str = format!(
@@ -248,7 +246,7 @@ pub fn run_game(difficulty: Difficulty) {
             ),
         );
 
-        let hexdump_first_addr = 0x1234; // TODO: randomize for fun flavor
+        let hexdump_first_addr = rng.gen_range(0xCC00, 0xFFFF);
         render_hexdump_pane(
             &window,
             &HEX_DUMP_PANE,
@@ -278,10 +276,10 @@ pub fn run_game(difficulty: Difficulty) {
     }
 
     // now let's run a mock game_loop
-    run_game_from_line_console(&rand_words, &mut rng);
+    // run_game_from_line_console(&rand_words, &mut rng);
 }
 
-fn run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
+fn _run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
     // Select an answer
     let solution = select_rand(words, rng);
 
