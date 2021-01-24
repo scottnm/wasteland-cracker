@@ -195,41 +195,39 @@ pub fn run_game(difficulty: Difficulty) {
 
     const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
 
+    let left_hex_dump_rect = Rect {
+        left: 0,
+        top: HEXDUMP_PANE_VERT_OFFSET,
+        width: HEX_DUMP_PANE.full_width(),
+        height: HEX_DUMP_PANE.height(),
+    };
+
+    let right_hex_dump_rect = Rect {
+        left: left_hex_dump_rect.width + HEX_DUMP_PANE.padding(),
+        top: left_hex_dump_rect.top,
+        width: HEX_DUMP_PANE.full_width(),
+        height: HEX_DUMP_PANE.height(),
+    };
+
     // Generate a random set of words based on the difficulty
     let mut rng = ThreadRangeRng::new();
     let rand_words = generate_words(difficulty, &mut rng);
     let (obfuscated_words, _word_offsets) =
         obfuscate_words(&rand_words, HEX_DUMP_PANE.max_bytes_in_pane() * 2, &mut rng);
+    let hexdump_start_addr = rng.gen_range(0xCC00, 0xFFFF);
 
-    // For the sake of keeping the windowing around let's dump those words in a window
-    {
-        // setup the window
-        let window = pancurses::initscr();
-        pancurses::noecho(); // prevent key inputs rendering to the screen
-        pancurses::cbreak();
-        pancurses::curs_set(0);
-        pancurses::set_title(TITLE);
-        window.nodelay(true); // don't block waiting for key inputs (we'll poll)
-        window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
-
-        // TODO just open a stub window for now. We'll write the game soon.
+    // setup the window
+    let window = pancurses::initscr();
+    pancurses::noecho(); // prevent key inputs rendering to the screen
+    pancurses::cbreak();
+    pancurses::curs_set(0);
+    pancurses::set_title(TITLE);
+    window.nodelay(true); // don't block waiting for key inputs (we'll poll)
+    window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
+    while window.getch() != Some(pancurses::Input::Character('q')) {
         window.clear();
 
-        // are all of these constants only used by this struct?
-        let left_hex_dump_rect = Rect {
-            left: 0,
-            top: HEXDUMP_PANE_VERT_OFFSET,
-            width: HEX_DUMP_PANE.full_width(),
-            height: HEX_DUMP_PANE.height(),
-        };
-
-        let right_hex_dump_rect = Rect {
-            left: left_hex_dump_rect.width + HEX_DUMP_PANE.padding(),
-            top: left_hex_dump_rect.top,
-            width: HEX_DUMP_PANE.full_width(),
-            height: HEX_DUMP_PANE.height(),
-        };
-
+        // Render the hex dump header
         window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
         window.mvaddstr(1, 0, "ENTER PASSWORD NOW");
         const BLOCK_CHAR: char = '#';
@@ -242,34 +240,30 @@ pub fn run_game(difficulty: Difficulty) {
             ),
         );
 
-        let hexdump_first_addr = rng.gen_range(0xCC00, 0xFFFF);
+        // Render the left hex dump pane
         render_hexdump_pane(
             &window,
             &HEX_DUMP_PANE,
             &left_hex_dump_rect,
-            hexdump_first_addr,
+            hexdump_start_addr,
             &obfuscated_words,
         );
 
+        // Render the right hex dump pane
         render_hexdump_pane(
             &window,
             &HEX_DUMP_PANE,
             &right_hex_dump_rect,
-            hexdump_first_addr + HEX_DUMP_PANE.max_bytes_in_pane(),
+            hexdump_start_addr + HEX_DUMP_PANE.max_bytes_in_pane(),
             &obfuscated_words[HEX_DUMP_PANE.max_bytes_in_pane()..],
         );
 
-        /* TODO: render the words in the memdump
-        window.mvaddstr(0, 0, format!("{:?}", difficulty));
-        for (i, rand_word) in rand_words.iter().enumerate() {
-            window.mvaddstr(i as i32 + 1, 0, rand_word);
-        }
-        */
-
         window.refresh();
-        std::thread::sleep(std::time::Duration::from_millis(5000));
-        pancurses::endwin();
+
+        // No need to waste cycles doing nothing but rendering over and over. Yield the processor.
+        std::thread::sleep(std::time::Duration::from_millis(33));
     }
+    pancurses::endwin();
 
     // now let's run a mock game_loop
     // run_game_from_line_console(&rand_words, &mut rng);
