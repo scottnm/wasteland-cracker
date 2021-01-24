@@ -53,8 +53,8 @@ impl HexDumpPane {
         self.dump_width + self.addr_to_dump_padding + self.addr_width
     }
 
-    const fn addr_width(&self) -> i32 {
-        self.addr_width
+    const fn addr_width(&self) -> usize {
+        self.addr_width as usize
     }
 
     const fn padding(&self) -> i32 {
@@ -115,28 +115,26 @@ fn render_hexdump_pane(
     bytes: &str,
 ) {
     for row in 0..hex_dump_dimensions.height() {
-        let memaddr = mem_start + (row * hex_dump_dimensions.width()) as usize;
-        let memaddr_str = format!(
+        let byte_offset = (row * hex_dump_dimensions.width()) as usize;
+        let mem_addr = format!(
             "0x{:0width$X}",
-            memaddr,
-            width = (hex_dump_dimensions.addr_width() as usize) - 2,
+            mem_start + byte_offset,
+            width = hex_dump_dimensions.addr_width() - 2,
         );
 
-        let byte_offset = (row * hex_dump_dimensions.width()) as usize;
-        let row_bytes = &bytes[byte_offset..];
-        let row_bytes = &row_bytes[..hex_dump_dimensions.width() as usize];
+        let row_bytes = &bytes[byte_offset..][..hex_dump_dimensions.width() as usize];
 
         let y = row + render_rect.top;
 
         // render the memaddr
-        window.mvaddstr(y, render_rect.left, &memaddr_str);
+        window.mvaddstr(y, render_rect.left, &mem_addr);
 
         // render the dump
-        let hex_dump_bytes_offset =
-            render_rect.left + memaddr_str.len() as i32 + hex_dump_dimensions.padding();
-        for (i, byte) in row_bytes.chars().enumerate() {
-            window.mvaddch(y, hex_dump_bytes_offset + i as i32, byte);
-        }
+        window.mvaddstr(
+            y,
+            render_rect.left + mem_addr.len() as i32 + hex_dump_dimensions.padding(),
+            row_bytes,
+        );
     }
 }
 
