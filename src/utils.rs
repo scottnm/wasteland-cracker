@@ -8,3 +8,10 @@ pub fn matching_char_count_ignore_case(a: &str, b: &str) -> usize {
         .filter(chars_eq_ignore_case)
         .count()
 }
+
+pub struct Rect {
+    pub left: i32,
+    pub top: i32,
+    pub width: i32,
+    pub height: i32,
+}
