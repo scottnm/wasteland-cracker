@@ -27,14 +27,6 @@ pub enum Difficulty {
     VeryHard,
 }
 
-struct SelectedChunk {
-    pane_num: usize,
-    row_num: usize,
-    col_start: usize,
-    len: usize,
-    dirty: bool,
-}
-
 struct HexDumpPane {
     dump_width: i32,
     dump_height: i32,
@@ -113,6 +105,9 @@ fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<
         .collect()
 }
 
+// TODO: this chunk render function is pretty nasty. can it be refactored better readability
+// one idea is to split out the rendering of memory addresses from rendering out the actual hex dumps
+//   this could help greatly clean up some offset calculations...
 fn render_hexdump_pane(
     window: &pancurses::Window,
     hex_dump_dimensions: &HexDumpPane,
@@ -236,6 +231,15 @@ pub fn run_game(difficulty: Difficulty) {
     const MAX_MEMADDR: usize = 0xFFFF - MAX_BYTES_IN_DUMP;
     const_assert!(MIN_MEMADDR < MAX_MEMADDR);
     let hexdump_start_addr = rng.gen_range(MIN_MEMADDR, MAX_MEMADDR);
+
+    // TODO: this chunk selection logic is pretty ugly. Can it be refactored for readability?
+    struct SelectedChunk {
+        pane_num: usize,
+        row_num: usize,
+        col_start: usize,
+        len: usize,
+        dirty: bool,
+    }
 
     // initially select the first character in the row pane
     let mut selected_chunk = SelectedChunk {
@@ -509,5 +513,10 @@ mod tests {
             let word_in_blob = &obfuscated_words[*word_offset..][..word.len()];
             assert_eq!(word, word_in_blob);
         }
+    }
+
+    #[test]
+    fn todo_build_gate_stop() {
+        todo!("There are a bunch of todos in this file (mostly around refactoring). Try and address before next PR.");
     }
 }
