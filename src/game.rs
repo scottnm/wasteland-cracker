@@ -241,11 +241,15 @@ pub fn run_game(difficulty: Difficulty) {
     // Generate a random set of words based on the difficulty
     let mut rng = ThreadRangeRng::new();
     let words = generate_words(difficulty, &mut rng);
-    let (hex_dump, word_offsets) =
-        obfuscate_words(&words, HEX_DUMP_PANE.max_bytes_in_pane() * 2, &mut rng);
+    const MAX_BYTES_IN_DUMP: usize = HEX_DUMP_PANE.max_bytes_in_pane() * 2; // 2 dump panes
+    let (hex_dump, word_offsets) = obfuscate_words(&words, MAX_BYTES_IN_DUMP, &mut rng);
     let (hex_dump_left_pane, hex_dump_right_pane) =
         hex_dump.split_at(HEX_DUMP_PANE.max_bytes_in_pane());
-    let hexdump_start_addr = rng.gen_range(0xCC00, 0xFFFF);
+
+    const MIN_MEMADDR: usize = 0xCC00;
+    const MAX_MEMADDR: usize = 0xFFFF - MAX_BYTES_IN_DUMP;
+    const_assert!(MIN_MEMADDR < MAX_MEMADDR);
+    let hexdump_start_addr = rng.gen_range(MIN_MEMADDR, MAX_MEMADDR);
 
     // initially select the first character in the row pane
     let mut selected_chunk = SelectedChunk {

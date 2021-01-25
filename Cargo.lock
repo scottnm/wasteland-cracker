@@ -25,6 +25,7 @@ dependencies = [
  "pancurses",
  "rand",
  "snm_simple_file",
+ "static_assertions",
  "text_io",
 ]
 
@@ -155,6 +156,12 @@ dependencies = [
 name = "snm_simple_file"
 version = "0.1.0"
 source = "git+https://github.com/scottnm/snm_simple_file?branch=main#b9730f7cc37309cb41e089c29005adb57bb80151"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "text_io"
