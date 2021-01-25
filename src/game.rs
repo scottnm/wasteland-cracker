@@ -27,6 +27,14 @@ pub enum Difficulty {
     VeryHard,
 }
 
+struct SelectedChunk {
+    pane_num: usize,
+    row_num: usize,
+    col_start: usize,
+    len: usize,
+    dirty: bool,
+}
+
 struct HexDumpPane {
     dump_width: i32,
     dump_height: i32,
@@ -111,6 +119,7 @@ fn render_hexdump_pane(
     render_rect: &Rect,
     mem_start: usize,
     bytes: &str,
+    selected_chunk: Option<&SelectedChunk>,
 ) {
     for row in 0..hex_dump_dimensions.height() {
         let byte_offset = (row * hex_dump_dimensions.width()) as usize;
@@ -133,6 +142,26 @@ fn render_hexdump_pane(
             render_rect.left + mem_addr.len() as i32 + hex_dump_dimensions.padding(),
             row_bytes,
         );
+    }
+
+    if let Some(selection) = selected_chunk {
+        let y = selection.row_num as i32 + render_rect.top;
+        let hex_dump_col_offset = render_rect.left
+            + hex_dump_dimensions.addr_width() as i32
+            + hex_dump_dimensions.padding();
+        let row_1_col = hex_dump_col_offset + selection.col_start as i32;
+        let selection_len = selection.len as i32;
+        let selection_len_row_1 = std::cmp::min(
+            hex_dump_dimensions.width() - selection.col_start as i32,
+            selection_len,
+        );
+
+        window.mvchgat(y, row_1_col, selection_len_row_1, pancurses::A_BLINK, 0);
+        if selection_len != selection_len_row_1 {
+            let row_2_col = hex_dump_col_offset;
+            let selection_len_row_2 = selection_len - selection_len_row_1;
+            window.mvchgat(y + 1, row_2_col, selection_len_row_2, pancurses::A_BLINK, 0);
+        }
     }
 }
 
@@ -218,20 +247,12 @@ pub fn run_game(difficulty: Difficulty) {
         hex_dump.split_at(HEX_DUMP_PANE.max_bytes_in_pane());
     let hexdump_start_addr = rng.gen_range(0xCC00, 0xFFFF);
 
-    struct SelectedChunk {
-        pane_num: usize,
-        row_num: usize,
-        col_start: usize,
-        col_end: usize,
-        dirty: bool,
-    };
-
     // initially select the first character in the row pane
     let mut selected_chunk = SelectedChunk {
         pane_num: 0,
         row_num: 0,
         col_start: 0,
-        col_end: 1,
+        len: 1,
         dirty: true,
     };
 
@@ -256,7 +277,9 @@ pub fn run_game(difficulty: Difficulty) {
             Some(pancurses::Input::Character('w')) => Some(InputCmd::Movement(0, -1)),
             Some(pancurses::Input::Character('a')) => Some(InputCmd::Movement(-1, 0)),
             Some(pancurses::Input::Character('s')) => Some(InputCmd::Movement(0, 1)),
-            Some(pancurses::Input::Character('d')) => Some(InputCmd::Movement(1, 0)),
+            Some(pancurses::Input::Character('d')) => {
+                Some(InputCmd::Movement(selected_chunk.len as i32, 0))
+            }
             Some(pancurses::Input::Character('q')) => Some(InputCmd::Quit),
             // TODO: handle entering in guesses... Some(pancurses::Input::Character('ENTER')) => (),
             _ => None,
@@ -298,7 +321,7 @@ pub fn run_game(difficulty: Difficulty) {
                 pane_num: next_pane as usize,
                 row_num: next_row as usize,
                 col_start: next_col as usize,
-                col_end: next_col as usize + 1,
+                len: 1,
                 dirty: true,
             };
         }
@@ -321,16 +344,26 @@ pub fn run_game(difficulty: Difficulty) {
                 if cursor_index >= word_range.0 && cursor_index < word_range.1 {
                     // if our cursor is on or in the middle of a full word, update the cursor selection
                     // to highlight the whole word
-                    let word_len = word_range.1 - word_range.0;
                     let cursor_offset = cursor_index - word_range.0;
-                    selected_chunk.col_start -= cursor_offset;
-                    selected_chunk.col_end = selected_chunk.col_start + word_len;
+                    if cursor_offset > selected_chunk.col_start {
+                        selected_chunk.row_num -= 1;
+                        selected_chunk.col_start += HEX_DUMP_PANE.width() as usize - cursor_offset;
+                    } else {
+                        selected_chunk.col_start -= cursor_offset;
+                    }
+                    selected_chunk.len = word_range.1 - word_range.0;
                     break;
                 }
             }
 
             selected_chunk.dirty = false;
         }
+
+        let (left_chunk_selection, right_chunk_selection) = if selected_chunk.pane_num == 0 {
+            (Some(&selected_chunk), None)
+        } else {
+            (None, Some(&selected_chunk))
+        };
 
         window.clear();
 
@@ -354,6 +387,7 @@ pub fn run_game(difficulty: Difficulty) {
             &left_hex_dump_rect,
             hexdump_start_addr,
             &hex_dump_left_pane,
+            left_chunk_selection,
         );
 
         // Render the right hex dump pane
@@ -363,6 +397,7 @@ pub fn run_game(difficulty: Difficulty) {
             &right_hex_dump_rect,
             hexdump_start_addr + hex_dump_left_pane.len(),
             &hex_dump_right_pane,
+            right_chunk_selection,
         );
 
         window.refresh();
