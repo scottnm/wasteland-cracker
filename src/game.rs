@@ -117,51 +117,39 @@ fn render_hexdump_pane(
     window: &pancurses::Window,
     hex_dump_dimensions: &HexDumpPane,
     render_rect: &Rect,
-    mem_start: usize,
+    hex_dump_first_byte: usize,
     bytes: &str,
-    selected_chunk: Option<&SelectedChunk>,
+    pane_offset: usize,
+    (highlighted_byte_start, highlighted_byte_end): (usize, usize),
 ) {
     for row in 0..hex_dump_dimensions.height() {
-        let byte_offset = (row * hex_dump_dimensions.width()) as usize;
+        let row_first_byte = pane_offset + (row * hex_dump_dimensions.width()) as usize;
         let mem_addr = format!(
             "0x{:0width$X}",
-            mem_start + byte_offset,
+            hex_dump_first_byte + row_first_byte,
             width = hex_dump_dimensions.addr_width() - 2,
         );
-
-        let row_bytes = &bytes[byte_offset..][..hex_dump_dimensions.width() as usize];
 
         let y = row + render_rect.top;
 
         // render the memaddr
         window.mvaddstr(y, render_rect.left, &mem_addr);
 
-        // render the dump
-        window.mvaddstr(
-            y,
-            render_rect.left + mem_addr.len() as i32 + hex_dump_dimensions.padding(),
-            row_bytes,
-        );
-    }
-
-    if let Some(selection) = selected_chunk {
-        let y = selection.row_num as i32 + render_rect.top;
-        let hex_dump_col_offset = render_rect.left
-            + hex_dump_dimensions.addr_width() as i32
-            + hex_dump_dimensions.padding();
-        let row_1_col = hex_dump_col_offset + selection.col_start as i32;
-        let selection_len = selection.len as i32;
-        let selection_len_row_1 = std::cmp::min(
-            hex_dump_dimensions.width() - selection.col_start as i32,
-            selection_len,
-        );
-
-        window.mvchgat(y, row_1_col, selection_len_row_1, pancurses::A_BLINK, 0);
-        if selection_len != selection_len_row_1 {
-            let row_2_col = hex_dump_col_offset;
-            let selection_len_row_2 = selection_len - selection_len_row_1;
-            window.mvchgat(y + 1, row_2_col, selection_len_row_2, pancurses::A_BLINK, 0);
+        let begin_dump_offset =
+            render_rect.left + mem_addr.len() as i32 + hex_dump_dimensions.padding();
+        let byte_at_cols = bytes[row_first_byte..]
+            .chars()
+            .zip(0..hex_dump_dimensions.width());
+        for (byte, col_index) in byte_at_cols {
+            let byte_offset = row_first_byte + col_index as usize;
+            if byte_offset >= highlighted_byte_start && byte_offset < highlighted_byte_end {
+                window.attron(pancurses::A_BLINK);
+            } else {
+                window.attroff(pancurses::A_BLINK);
+            }
+            window.mvaddch(y, begin_dump_offset + col_index, byte);
         }
+        window.attroff(pancurses::A_BLINK);
     }
 }
 
@@ -243,8 +231,6 @@ pub fn run_game(difficulty: Difficulty) {
     let words = generate_words(difficulty, &mut rng);
     const MAX_BYTES_IN_DUMP: usize = HEX_DUMP_PANE.max_bytes_in_pane() * 2; // 2 dump panes
     let (hex_dump, word_offsets) = obfuscate_words(&words, MAX_BYTES_IN_DUMP, &mut rng);
-    let (hex_dump_left_pane, hex_dump_right_pane) =
-        hex_dump.split_at(HEX_DUMP_PANE.max_bytes_in_pane());
 
     const MIN_MEMADDR: usize = 0xCC00;
     const MAX_MEMADDR: usize = 0xFFFF - MAX_BYTES_IN_DUMP;
@@ -363,10 +349,12 @@ pub fn run_game(difficulty: Difficulty) {
             selected_chunk.dirty = false;
         }
 
-        let (left_chunk_selection, right_chunk_selection) = if selected_chunk.pane_num == 0 {
-            (Some(&selected_chunk), None)
-        } else {
-            (None, Some(&selected_chunk))
+        let highlighted_byte_range = {
+            let start = selected_chunk.pane_num * HEX_DUMP_PANE.max_bytes_in_pane()
+                + selected_chunk.row_num * HEX_DUMP_PANE.width() as usize
+                + selected_chunk.col_start;
+            let end = start + selected_chunk.len;
+            (start, end)
         };
 
         window.clear();
@@ -390,8 +378,9 @@ pub fn run_game(difficulty: Difficulty) {
             &HEX_DUMP_PANE,
             &left_hex_dump_rect,
             hexdump_start_addr,
-            &hex_dump_left_pane,
-            left_chunk_selection,
+            &hex_dump,
+            0,
+            highlighted_byte_range,
         );
 
         // Render the right hex dump pane
@@ -399,9 +388,10 @@ pub fn run_game(difficulty: Difficulty) {
             &window,
             &HEX_DUMP_PANE,
             &right_hex_dump_rect,
-            hexdump_start_addr + hex_dump_left_pane.len(),
-            &hex_dump_right_pane,
-            right_chunk_selection,
+            hexdump_start_addr,
+            &hex_dump,
+            hex_dump.len() / 2,
+            highlighted_byte_range,
         );
 
         window.refresh();
