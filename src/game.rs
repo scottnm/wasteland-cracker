@@ -519,4 +519,15 @@ mod tests {
     fn todo_build_gate_stop() {
         todo!("There are a bunch of todos in this file (mostly around refactoring). Try and address before next PR.");
     }
+
+    #[test]
+    fn bug_check() {
+        // TODO: write test and fix
+        // XXXXXX   dokieX <-- move the cursor from X to 'e' in "dokie"
+        // XXXXXX   XXXXXX
+        // XXXXXX   XXXXXX
+        // XXXXXX   XXXXXX
+        // XXokie   XXXXXX
+        todo!("if a word wraps between panes and you move into a selection from the end of a word it crashes");
+    }
 }
