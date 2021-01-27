@@ -64,7 +64,7 @@ enum Movement {
 //#[derive(PartialEq, Eq)]
 enum InputCmd {
     Move(Movement),
-    Select,
+    _Select,
     Quit,
 }
 
@@ -454,7 +454,7 @@ pub fn run_game(difficulty: Difficulty) {
                 }
 
                 // Handle selecting a word
-                InputCmd::Select => unimplemented!(),
+                InputCmd::_Select => unimplemented!(),
 
                 // Handle quitting the game early
                 InputCmd::Quit => break,
