@@ -8,6 +8,10 @@ The plan is to extend it to also be able to play a clone of the cracking game.
 
 ## Game Demo Progress
 
+- [Added cursor navigation and word selection to the TUI](https://github.com/scottnm/fonv-cracker/commit/1b7074c8)
+
+![Game screen with showing cursor navigation and word selection](demo/05-tui-selection.gif)
+
 - [Fill in hex dump screen with selected words and memory noise](https://github.com/scottnm/fonv-cracker/commit/108b30f)
 
 ![Game screen with random words and memory noise in hex dump view](demo/04-fill-in-words.png)
