@@ -68,6 +68,8 @@ enum InputCmd {
     Quit,
 }
 
+// TODO: should this be split out into two structs?
+// one for dump dimensions and another for formatting? (i.e. the padding param)
 struct HexDumpPane {
     dump_width: i32,
     dump_height: i32,
@@ -102,6 +104,7 @@ impl HexDumpPane {
 }
 
 // TODO: this chunk selection logic is pretty ugly. Can it be refactored for readability?
+#[derive(Debug, PartialEq, Eq)]
 struct SelectedChunk {
     pane_num: usize,
     row_num: usize,
@@ -178,9 +181,9 @@ fn move_selection(
     }
 }
 
-fn refit_selection(
+fn refit_selection<S: AsRef<str>>(
     selection: SelectedChunk,
-    words: &[String],
+    words: &[S],
     word_offsets: &[usize],
     hex_dump_pane_dimensions: &HexDumpPane,
 ) -> SelectedChunk {
@@ -193,7 +196,7 @@ fn refit_selection(
     let word_ranges = words
         .iter()
         .zip(word_offsets.iter())
-        .map(|(word, word_offset)| (*word_offset, word_offset + word.len()));
+        .map(|(word, word_offset)| (*word_offset, word_offset + word.as_ref().len()));
 
     // TODO: clean up this implementation. It's a bit ugly
     let mut result_selection = selection;
@@ -586,30 +589,417 @@ mod tests {
         }
     }
 
-    #[test]
-    fn todo_build_gate_stop() {
-        todo!("There are a bunch of todos in this file (mostly around refactoring). Try and address before next PR.");
+    fn move_and_refit(
+        mut selection: SelectedChunk,
+        movement: Movement,
+        words: &[&str],
+        word_offsets: &[usize],
+        hex_dump_pane_dimensions: &HexDumpPane,
+        num_panes: usize,
+    ) -> SelectedChunk {
+        selection = move_selection(selection, movement, &hex_dump_pane_dimensions, num_panes);
+        refit_selection(selection, &words, &word_offsets, &hex_dump_pane_dimensions)
     }
 
     #[test]
-    fn bug_check() {
-        // TODO: write test and fix
-        // XXXXXX   dokieX <-- move the cursor from X to 'e' in "dokie"
-        // XXXXXX   XXXXXX
-        // XXXXXX   XXXXXX
-        // XXXXXX   XXXXXX
-        // XXokie   XXXXXX
-        todo!("if a word wraps between panes and you move into a selection from the end of a word it crashes");
+    fn test_single_char_move_next() {
+        // .... ....
+        // .abc .xyz
+        // .... ....
+        //  ^^
+        let start_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 2,
+            col_start: 1,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 2,
+            col_start: 2,
+            len: 1,
+        };
+        let movement = Movement::Right;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
     }
 
-    // what is interesting behavior to test?
-    // - moving from one single char cell to the next
-    // - moving from one single char cell horizontally across panes (right)
-    // - moving from one single char cell horizontally across panes (left)
-    // - wrapping around vertically in a pane (should this move to the next pane instead?)
-    // - moving from one highlighted word to the next entry
-    // - moving from one highlighted word when that word wraps around rows
-    // - jumping down into the middle of a highlighted word
-    // - jumping up into the middle of a highlighted word
-    // - moving back into the middle of a highlighted word
+    #[test]
+    fn test_single_char_move_across_panes_right() {
+        // .... ....
+        // .abc .xyz
+        // .... ....
+        //    ^ ^
+        let start_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 2,
+            col_start: 3,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 2,
+            col_start: 0,
+            len: 1,
+        };
+        let movement = Movement::Right;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_single_char_move_across_panes_left() {
+        // .... ....
+        // .abc .xyz
+        // .... ....
+        // ^       ^
+        let start_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 2,
+            col_start: 0,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 2,
+            col_start: 3,
+            len: 1,
+        };
+        let movement = Movement::Left;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_word_move_wrap_vertical() {
+        //        v-start
+        // .... ....
+        // .abc .xyz
+        // .... ....
+        //        ^-end
+        let start_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 0,
+            col_start: 2,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 2,
+            col_start: 2,
+            len: 1,
+        };
+        let movement = Movement::Up;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_word_move_right() {
+        // v  v
+        // abc. ....
+        // .... .xyz
+        // .... ....
+        let start_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 0,
+            col_start: 0,
+            len: 3,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 0,
+            col_start: 3,
+            len: 1,
+        };
+        let movement = Movement::Right;
+        let words = ["abc", "xyz"];
+        let word_offsets = [0, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_word_move_left() {
+        // abc. ....
+        // .... .xyz
+        // .... ^^..
+        let start_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 1,
+            col_start: 1,
+            len: 3,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 1,
+            col_start: 0,
+            len: 1,
+        };
+        let movement = Movement::Left;
+        let words = ["abc", "xyz"];
+        let word_offsets = [0, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_move_word_wrapped() {
+        //   v  v
+        // ..ab ....
+        // c... .xyz
+        // .... ....
+        let start_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 0,
+            col_start: 2,
+            len: 3,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 0,
+            col_start: 0,
+            len: 1,
+        };
+        let movement = Movement::Right;
+        let words = ["abc", "xyz"];
+        let word_offsets = [2, 17];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_move_up_into_word_selection_vertical() {
+        //        v-start
+        // .... ....
+        // .abc ....
+        // .... .xyz
+        //       ^-end
+        let start_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 0,
+            col_start: 2,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 2,
+            col_start: 1,
+            len: 3,
+        };
+        let movement = Movement::Up;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 21];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_move_down_into_word_selection_vertical() {
+        // .... ....
+        // .abc ..v-start
+        // .... .xyz
+        //       ^-end
+        let start_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 1,
+            col_start: 2,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 2,
+            col_start: 1,
+            len: 3,
+        };
+        let movement = Movement::Down;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 21];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn test_move_left_into_cross_pane_word_selection() {
+        //       v-start
+        // .... z...
+        // .abc ....
+        // ..xy ....
+        //   ^-end
+        let start_selection = SelectedChunk {
+            pane_num: 1,
+            row_num: 0,
+            col_start: 1,
+            len: 1,
+        };
+        let expected_end_selection = SelectedChunk {
+            pane_num: 0,
+            row_num: 2,
+            col_start: 2,
+            len: 3,
+        };
+        let movement = Movement::Left;
+        let words = ["abc", "xyz"];
+        let word_offsets = [5, 10];
+        let hex_dump_pane_dimensions = HexDumpPane {
+            dump_width: 4,
+            dump_height: 3,
+            addr_width: 0,           // unused
+            addr_to_dump_padding: 0, // unused
+        };
+
+        let end_selection = move_and_refit(
+            start_selection,
+            movement,
+            &words,
+            &word_offsets,
+            &hex_dump_pane_dimensions,
+            2,
+        );
+
+        assert_eq!(end_selection, expected_end_selection);
+    }
 }
