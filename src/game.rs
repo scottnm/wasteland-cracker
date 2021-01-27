@@ -537,4 +537,15 @@ mod tests {
         // XXokie   XXXXXX
         todo!("if a word wraps between panes and you move into a selection from the end of a word it crashes");
     }
+
+    // what is interesting behavior to test?
+    // - moving from one single char cell to the next
+    // - moving from one single char cell horizontally across panes (right)
+    // - moving from one single char cell horizontally across panes (left)
+    // - wrapping around vertically in a pane (should this move to the next pane instead?)
+    // - moving from one highlighted word to the next entry
+    // - moving from one highlighted word when that word wraps around rows
+    // - jumping down into the middle of a highlighted word
+    // - jumping up into the middle of a highlighted word
+    // - moving back into the middle of a highlighted word
 }
