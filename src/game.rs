@@ -14,7 +14,6 @@
 use crate::dict;
 use crate::randwrapper::{select_rand, RangeRng, ThreadRangeRng};
 use crate::utils::Rect;
-use std::str::FromStr;
 
 const TITLE: &str = "FONV: Terminal Cracker";
 
@@ -25,6 +24,48 @@ pub enum Difficulty {
     Average,
     Hard,
     VeryHard,
+}
+
+impl std::str::FromStr for Difficulty {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.eq_ignore_ascii_case("VeryEasy") || s.eq_ignore_ascii_case("VE") {
+            return Ok(Difficulty::VeryEasy);
+        }
+
+        if s.eq_ignore_ascii_case("Easy") || s.eq_ignore_ascii_case("E") {
+            return Ok(Difficulty::Easy);
+        }
+
+        if s.eq_ignore_ascii_case("Average") || s.eq_ignore_ascii_case("A") {
+            return Ok(Difficulty::Average);
+        }
+
+        if s.eq_ignore_ascii_case("Hard") || s.eq_ignore_ascii_case("H") {
+            return Ok(Difficulty::Hard);
+        }
+
+        if s.eq_ignore_ascii_case("VeryHard") || s.eq_ignore_ascii_case("VH") {
+            return Ok(Difficulty::VeryHard);
+        }
+
+        Err("Invalid difficulty string")
+    }
+}
+
+enum Movement {
+    Left,
+    Right,
+    Up,
+    Down,
+}
+
+//#[derive(PartialEq, Eq)]
+enum InputCmd {
+    Move(Movement),
+    Select,
+    Quit,
 }
 
 struct HexDumpPane {
@@ -60,32 +101,12 @@ impl HexDumpPane {
     }
 }
 
-impl FromStr for Difficulty {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq_ignore_ascii_case("VeryEasy") || s.eq_ignore_ascii_case("VE") {
-            return Ok(Difficulty::VeryEasy);
-        }
-
-        if s.eq_ignore_ascii_case("Easy") || s.eq_ignore_ascii_case("E") {
-            return Ok(Difficulty::Easy);
-        }
-
-        if s.eq_ignore_ascii_case("Average") || s.eq_ignore_ascii_case("A") {
-            return Ok(Difficulty::Average);
-        }
-
-        if s.eq_ignore_ascii_case("Hard") || s.eq_ignore_ascii_case("H") {
-            return Ok(Difficulty::Hard);
-        }
-
-        if s.eq_ignore_ascii_case("VeryHard") || s.eq_ignore_ascii_case("VH") {
-            return Ok(Difficulty::VeryHard);
-        }
-
-        Err("Invalid difficulty string")
-    }
+// TODO: this chunk selection logic is pretty ugly. Can it be refactored for readability?
+struct SelectedChunk {
+    pane_num: usize,
+    row_num: usize,
+    col_start: usize,
+    len: usize,
 }
 
 fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<String> {
@@ -103,6 +124,105 @@ fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<
     (0..WORDS_TO_GENERATE_COUNT)
         .map(|_| dict_chunk.get_random_word(rng))
         .collect()
+}
+
+fn move_selection(
+    selection: SelectedChunk,
+    movement: Movement,
+    hex_dump_pane_dimensions: &HexDumpPane,
+    num_panes: usize,
+) -> SelectedChunk {
+    let (col_move, row_move): (i32, i32) = match movement {
+        Movement::Down => (0, 1),
+        Movement::Up => (0, -1),
+        Movement::Left => (-1, 0),
+        // We might be at the beginning of a full word, in which case move past the end of the word
+        Movement::Right => (selection.len as i32, 0),
+    };
+
+    // Naively update the row and col with our movement
+    let mut next_col = col_move + (selection.col_start as i32);
+    let mut next_row = row_move + (selection.row_num as i32);
+    let mut next_pane = selection.pane_num as i32;
+
+    // Check if we've moved from one pane to another by moving laterally across the columns in a row.
+    if next_col >= hex_dump_pane_dimensions.width() {
+        next_col = 0;
+        next_pane += 1;
+    } else if next_col < 0 {
+        next_col = hex_dump_pane_dimensions.width() - 1;
+        next_pane -= 1;
+    }
+
+    // Check if we've moved to an invalid row outside of our pane.
+    // In which case just wrap around to the next valid row in the same pane.
+    if next_row >= hex_dump_pane_dimensions.height() {
+        next_row = 0;
+    } else if next_row < 0 {
+        next_row = hex_dump_pane_dimensions.height() - 1;
+    }
+
+    // Check if we've moved to an invalid pane outside of our hex dump.
+    // In which case just wrap around to the next valid pane.
+    if next_pane >= num_panes as i32 {
+        next_pane = 0;
+    } else if next_pane < 0 {
+        next_pane = 1;
+    }
+
+    SelectedChunk {
+        pane_num: next_pane as usize,
+        row_num: next_row as usize,
+        col_start: next_col as usize,
+        len: 1,
+    }
+}
+
+fn refit_selection(
+    selection: SelectedChunk,
+    words: &[String],
+    word_offsets: &[usize],
+    hex_dump_pane_dimensions: &HexDumpPane,
+) -> SelectedChunk {
+    let cursor_index = selection.pane_num * hex_dump_pane_dimensions.max_bytes_in_pane()
+        + selection.row_num * hex_dump_pane_dimensions.width() as usize
+        + selection.col_start;
+
+    // turn our list of words and word_offsets into a list of ranges where those words live
+    // in the contiguous hex dump memory span
+    let word_ranges = words
+        .iter()
+        .zip(word_offsets.iter())
+        .map(|(word, word_offset)| (*word_offset, word_offset + word.len()));
+
+    // TODO: clean up this implementation. It's a bit ugly
+    let mut result_selection = selection;
+
+    for word_range in word_ranges {
+        if cursor_index >= word_range.0 && cursor_index < word_range.1 {
+            // if our cursor is on or in the middle of a full word, update the cursor selection
+            // to highlight the whole word
+            let cursor_offset = cursor_index - word_range.0;
+            if cursor_offset <= result_selection.col_start {
+                result_selection.col_start -= cursor_offset;
+            } else {
+                // account for the word starting on the previous row
+                // account for the previous row, being in the previous pane
+                if result_selection.row_num > 0 {
+                    result_selection.row_num -= 1;
+                } else {
+                    result_selection.row_num = (hex_dump_pane_dimensions.height() - 1) as usize;
+                    result_selection.pane_num -= 1;
+                }
+                result_selection.col_start +=
+                    hex_dump_pane_dimensions.width() as usize - cursor_offset;
+            }
+            result_selection.len = word_range.1 - word_range.0;
+            break;
+        }
+    }
+
+    result_selection
 }
 
 // TODO: this chunk render function is pretty nasty. can it be refactored better readability
@@ -199,8 +319,9 @@ fn obfuscate_words(
 
 pub fn run_game(difficulty: Difficulty) {
     const HEX_DUMP_PANE: HexDumpPane = HexDumpPane {
-        dump_width: 12,                    // 12 characters per row of the hexdump
-        dump_height: 16,                   // 16 rows of hex dump per dump pane
+        dump_width: 12,  // 12 characters per row of the hexdump
+        dump_height: 16, // 16 rows of hex dump per dump pane
+        // TODO: update this to not be characters but bytes or bits or something
         addr_width: "0x1234".len() as i32, // 2 byte memaddr
         addr_to_dump_padding: 4,           // horizontal padding between panes in the memdump window
     };
@@ -221,25 +342,19 @@ pub fn run_game(difficulty: Difficulty) {
         height: HEX_DUMP_PANE.height(),
     };
 
-    // Generate a random set of words based on the difficulty
+    // Generate a random set of words based on the provided difficulty setting
     let mut rng = ThreadRangeRng::new();
     let words = generate_words(difficulty, &mut rng);
+
+    // Generate a mock hexdump from the randomly generated words
     const MAX_BYTES_IN_DUMP: usize = HEX_DUMP_PANE.max_bytes_in_pane() * 2; // 2 dump panes
     let (hex_dump, word_offsets) = obfuscate_words(&words, MAX_BYTES_IN_DUMP, &mut rng);
 
+    // For visual flair, randomize the mem address of the hex dump
     const MIN_MEMADDR: usize = 0xCC00;
     const MAX_MEMADDR: usize = 0xFFFF - MAX_BYTES_IN_DUMP;
     const_assert!(MIN_MEMADDR < MAX_MEMADDR);
     let hexdump_start_addr = rng.gen_range(MIN_MEMADDR, MAX_MEMADDR);
-
-    // TODO: this chunk selection logic is pretty ugly. Can it be refactored for readability?
-    struct SelectedChunk {
-        pane_num: usize,
-        row_num: usize,
-        col_start: usize,
-        len: usize,
-        dirty: bool,
-    }
 
     // initially select the first character in the row pane
     let mut selected_chunk = SelectedChunk {
@@ -247,8 +362,10 @@ pub fn run_game(difficulty: Difficulty) {
         row_num: 0,
         col_start: 0,
         len: 1,
-        dirty: true,
     };
+
+    // Immediately refit the selection in case the first character is part of a larger word
+    selected_chunk = refit_selection(selected_chunk, &words, &word_offsets, &HEX_DUMP_PANE);
 
     // setup the window
     let window = pancurses::initscr();
@@ -261,112 +378,34 @@ pub fn run_game(difficulty: Difficulty) {
 
     // TODO: refactor this loop for readability and testing
     loop {
-        #[derive(PartialEq, Eq)]
-        enum InputCmd {
-            Movement(i32, i32),
-            Quit,
-        }
-
-        let input_cmd = match window.getch() {
-            Some(pancurses::Input::Character('w')) => Some(InputCmd::Movement(0, -1)),
-            Some(pancurses::Input::Character('a')) => Some(InputCmd::Movement(-1, 0)),
-            Some(pancurses::Input::Character('s')) => Some(InputCmd::Movement(0, 1)),
-            Some(pancurses::Input::Character('d')) => {
-                Some(InputCmd::Movement(selected_chunk.len as i32, 0))
-            }
+        let polled_input_cmd = match window.getch() {
+            Some(pancurses::Input::Character('w')) => Some(InputCmd::Move(Movement::Up)),
+            Some(pancurses::Input::Character('s')) => Some(InputCmd::Move(Movement::Down)),
+            Some(pancurses::Input::Character('a')) => Some(InputCmd::Move(Movement::Left)),
+            Some(pancurses::Input::Character('d')) => Some(InputCmd::Move(Movement::Right)),
             Some(pancurses::Input::Character('q')) => Some(InputCmd::Quit),
             // TODO: handle entering in guesses... Some(pancurses::Input::Character('ENTER')) => (),
             _ => None,
         };
 
-        // Handle quitting early
-        if input_cmd == Some(InputCmd::Quit) {
-            break;
-        }
-
-        // Handle movement inputs
-        // If we detect an input which says we should move the cursor, update the selected chunk
-        if let Some(InputCmd::Movement(col_move, row_move)) = input_cmd {
-            let mut next_col = col_move + (selected_chunk.col_start as i32);
-            let mut next_row = row_move + (selected_chunk.row_num as i32);
-            let mut next_pane = selected_chunk.pane_num as i32;
-
-            if next_col >= HEX_DUMP_PANE.width() {
-                next_col = 0;
-                next_pane += 1;
-            } else if next_col < 0 {
-                next_col = HEX_DUMP_PANE.width() - 1;
-                next_pane -= 1;
-            }
-
-            if next_row >= HEX_DUMP_PANE.height() {
-                next_row = 0;
-            } else if next_row < 0 {
-                next_row = HEX_DUMP_PANE.height() - 1;
-            }
-
-            if next_pane >= 2 {
-                next_pane = 0;
-            } else if next_pane < 0 {
-                next_pane = 1;
-            }
-
-            selected_chunk = SelectedChunk {
-                pane_num: next_pane as usize,
-                row_num: next_row as usize,
-                col_start: next_col as usize,
-                len: 1,
-                dirty: true,
-            };
-        }
-
-        // if we've moved (or just initialized) the chunk selection, we may need to refit it to select
-        // a whole word.
-        if selected_chunk.dirty {
-            // the index of the cursor in the contiguous hex dump memory span
-            let cursor_index = selected_chunk.pane_num * HEX_DUMP_PANE.max_bytes_in_pane()
-                + selected_chunk.row_num * HEX_DUMP_PANE.width() as usize
-                + selected_chunk.col_start;
-
-            // turn our list of words and word_offsets into a list of ranges where those words live
-            // in the contiguous hex dump memory span
-            let word_ranges = words
-                .iter()
-                .zip(word_offsets.iter())
-                .map(|(word, word_offset)| (*word_offset, word_offset + word.len()));
-            for word_range in word_ranges {
-                if cursor_index >= word_range.0 && cursor_index < word_range.1 {
-                    // if our cursor is on or in the middle of a full word, update the cursor selection
-                    // to highlight the whole word
-                    let cursor_offset = cursor_index - word_range.0;
-                    if cursor_offset <= selected_chunk.col_start {
-                        selected_chunk.col_start -= cursor_offset;
-                    } else {
-                        // account for the word starting on the previous row
-                        // account for the previous row, being in the previous pane
-                        if selected_chunk.row_num > 0 {
-                            selected_chunk.row_num -= 1;
-                        } else {
-                            selected_chunk.row_num = (HEX_DUMP_PANE.height() - 1) as usize;
-                            selected_chunk.pane_num -= 1;
-                        }
-                        selected_chunk.col_start += HEX_DUMP_PANE.width() as usize - cursor_offset;
-                    }
-                    selected_chunk.len = word_range.1 - word_range.0;
-                    break;
+        if let Some(input_cmd) = polled_input_cmd {
+            match input_cmd {
+                // Handle moving the cursor around the hex dump pane
+                InputCmd::Move(movement) => {
+                    // Move the cursor based on our input
+                    selected_chunk = move_selection(selected_chunk, movement, &HEX_DUMP_PANE, 2);
+                    // If the cursor is now selecting a word, refit the selection highlight for the whole word
+                    selected_chunk =
+                        refit_selection(selected_chunk, &words, &word_offsets, &HEX_DUMP_PANE);
                 }
+
+                // Handle selecting a word
+                InputCmd::Select => unimplemented!(),
+
+                // Handle quitting the game early
+                InputCmd::Quit => break,
             }
-
-            selected_chunk.dirty = false;
         }
-
-        let highlighted_byte_range = {
-            let start = selected_chunk.pane_num * HEX_DUMP_PANE.max_bytes_in_pane()
-                + selected_chunk.row_num * HEX_DUMP_PANE.width() as usize
-                + selected_chunk.col_start;
-            let end = start + selected_chunk.len;
-            (start, end)
-        };
 
         window.clear();
 
@@ -382,6 +421,14 @@ pub fn run_game(difficulty: Difficulty) {
                 BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR
             ),
         );
+
+        let highlighted_byte_range = {
+            let start = selected_chunk.pane_num * HEX_DUMP_PANE.max_bytes_in_pane()
+                + selected_chunk.row_num * HEX_DUMP_PANE.width() as usize
+                + selected_chunk.col_start;
+            let end = start + selected_chunk.len;
+            (start, end)
+        };
 
         // Render the left hex dump pane
         render_hexdump_pane(
