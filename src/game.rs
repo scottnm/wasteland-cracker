@@ -1,8 +1,5 @@
 // Work breakdown
 // - setup a better word selection algorithm which results in more common letters
-// - add support for selecting between the words in the TUI and highlighting the current selection
-//      - mouse support?
-//      - keyboard support?
 // - add support for using that selection instead of text input to power the gameloop
 // - add an output pane which tells you the results of your current selection
 // - refactor out tui utils into its own module
