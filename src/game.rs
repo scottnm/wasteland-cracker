@@ -317,6 +317,51 @@ fn obfuscate_words(
     (string_builder, offsets)
 }
 
+fn render_game_window(
+    window: &pancurses::Window,
+    cursor_selection: &SelectedChunk,
+    hex_dump_start_addr: usize,
+    hex_dump: &str,
+    hex_dump_dimensions: &HexDumpPane,
+    hex_dump_rects: &[Rect],
+) {
+    // Render the hex dump header
+    window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
+    window.mvaddstr(1, 0, "ENTER PASSWORD NOW");
+    const BLOCK_CHAR: char = '#';
+    window.mvaddstr(
+        3,
+        0,
+        format!(
+            "# ATTEMPT(S) LEFT: {} {} {} {}",
+            BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR
+        ),
+    );
+
+    let highlighted_byte_range = {
+        let start = cursor_selection.pane_num * hex_dump_dimensions.max_bytes_in_pane()
+            + cursor_selection.row_num * hex_dump_dimensions.width() as usize
+            + cursor_selection.col_start;
+        let end = start + cursor_selection.len;
+        (start, end)
+    };
+
+    // render each hex dump pane (assume ordered left to right)
+    for hex_dump_pane_index in 0..hex_dump_rects.len() {
+        let hex_dump_rect = &hex_dump_rects[hex_dump_pane_index];
+        let pane_byte_offset = hex_dump_pane_index * hex_dump_dimensions.max_bytes_in_pane();
+        render_hexdump_pane(
+            &window,
+            hex_dump_dimensions,
+            &hex_dump_rect,
+            hex_dump_start_addr + pane_byte_offset,
+            &hex_dump,
+            pane_byte_offset,
+            highlighted_byte_range,
+        );
+    }
+}
+
 pub fn run_game(difficulty: Difficulty) {
     const HEX_DUMP_PANE: HexDumpPane = HexDumpPane {
         dump_width: 12,  // 12 characters per row of the hexdump
@@ -328,18 +373,22 @@ pub fn run_game(difficulty: Difficulty) {
 
     const HEXDUMP_PANE_VERT_OFFSET: i32 = 5;
 
-    let left_hex_dump_rect = Rect {
-        left: 0,
-        top: HEXDUMP_PANE_VERT_OFFSET,
-        width: HEX_DUMP_PANE.full_width(),
-        height: HEX_DUMP_PANE.height(),
-    };
+    let hex_dump_rects = {
+        let left_hex_dump_rect = Rect {
+            left: 0,
+            top: HEXDUMP_PANE_VERT_OFFSET,
+            width: HEX_DUMP_PANE.full_width(),
+            height: HEX_DUMP_PANE.height(),
+        };
 
-    let right_hex_dump_rect = Rect {
-        left: left_hex_dump_rect.width + HEX_DUMP_PANE.padding(),
-        top: left_hex_dump_rect.top,
-        width: HEX_DUMP_PANE.full_width(),
-        height: HEX_DUMP_PANE.height(),
+        let right_hex_dump_rect = Rect {
+            left: left_hex_dump_rect.width + HEX_DUMP_PANE.padding(),
+            top: left_hex_dump_rect.top,
+            width: HEX_DUMP_PANE.full_width(),
+            height: HEX_DUMP_PANE.height(),
+        };
+
+        [left_hex_dump_rect, right_hex_dump_rect]
     };
 
     // Generate a random set of words based on the provided difficulty setting
@@ -354,7 +403,7 @@ pub fn run_game(difficulty: Difficulty) {
     const MIN_MEMADDR: usize = 0xCC00;
     const MAX_MEMADDR: usize = 0xFFFF - MAX_BYTES_IN_DUMP;
     const_assert!(MIN_MEMADDR < MAX_MEMADDR);
-    let hexdump_start_addr = rng.gen_range(MIN_MEMADDR, MAX_MEMADDR);
+    let hex_dump_start_addr = rng.gen_range(MIN_MEMADDR, MAX_MEMADDR);
 
     // initially select the first character in the row pane
     let mut selected_chunk = SelectedChunk {
@@ -378,6 +427,7 @@ pub fn run_game(difficulty: Difficulty) {
 
     // TODO: refactor this loop for readability and testing
     loop {
+        // Poll for input
         let polled_input_cmd = match window.getch() {
             Some(pancurses::Input::Character('w')) => Some(InputCmd::Move(Movement::Up)),
             Some(pancurses::Input::Character('s')) => Some(InputCmd::Move(Movement::Down)),
@@ -388,6 +438,7 @@ pub fn run_game(difficulty: Difficulty) {
             _ => None,
         };
 
+        // Handle the input
         if let Some(input_cmd) = polled_input_cmd {
             match input_cmd {
                 // Handle moving the cursor around the hex dump pane
@@ -407,54 +458,20 @@ pub fn run_game(difficulty: Difficulty) {
             }
         }
 
+        // Render the next frame
         window.clear();
-
-        // Render the hex dump header
-        window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
-        window.mvaddstr(1, 0, "ENTER PASSWORD NOW");
-        const BLOCK_CHAR: char = '#';
-        window.mvaddstr(
-            3,
-            0,
-            format!(
-                "# ATTEMPT(S) LEFT: {} {} {} {}",
-                BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR
-            ),
-        );
-
-        let highlighted_byte_range = {
-            let start = selected_chunk.pane_num * HEX_DUMP_PANE.max_bytes_in_pane()
-                + selected_chunk.row_num * HEX_DUMP_PANE.width() as usize
-                + selected_chunk.col_start;
-            let end = start + selected_chunk.len;
-            (start, end)
-        };
-
-        // Render the left hex dump pane
-        render_hexdump_pane(
+        render_game_window(
             &window,
-            &HEX_DUMP_PANE,
-            &left_hex_dump_rect,
-            hexdump_start_addr,
+            &selected_chunk,
+            hex_dump_start_addr,
             &hex_dump,
-            0,
-            highlighted_byte_range,
-        );
-
-        // Render the right hex dump pane
-        render_hexdump_pane(
-            &window,
             &HEX_DUMP_PANE,
-            &right_hex_dump_rect,
-            hexdump_start_addr,
-            &hex_dump,
-            hex_dump.len() / 2,
-            highlighted_byte_range,
+            &hex_dump_rects,
         );
-
         window.refresh();
 
-        // No need to waste cycles doing nothing but rendering over and over. Yield the processor.
+        // No need to waste cycles doing nothing but rendering over and over.
+        // Yield the processor until the next frame.
         std::thread::sleep(std::time::Duration::from_millis(33));
     }
     pancurses::endwin();
