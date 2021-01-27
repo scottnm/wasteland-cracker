@@ -339,11 +339,18 @@ pub fn run_game(difficulty: Difficulty) {
                     // if our cursor is on or in the middle of a full word, update the cursor selection
                     // to highlight the whole word
                     let cursor_offset = cursor_index - word_range.0;
-                    if cursor_offset > selected_chunk.col_start {
-                        selected_chunk.row_num -= 1;
-                        selected_chunk.col_start += HEX_DUMP_PANE.width() as usize - cursor_offset;
-                    } else {
+                    if cursor_offset <= selected_chunk.col_start {
                         selected_chunk.col_start -= cursor_offset;
+                    } else {
+                        // account for the word starting on the previous row
+                        // account for the previous row, being in the previous pane
+                        if selected_chunk.row_num > 0 {
+                            selected_chunk.row_num -= 1;
+                        } else {
+                            selected_chunk.row_num = (HEX_DUMP_PANE.height() - 1) as usize;
+                            selected_chunk.pane_num -= 1;
+                        }
+                        selected_chunk.col_start += HEX_DUMP_PANE.width() as usize - cursor_offset;
                     }
                     selected_chunk.len = word_range.1 - word_range.0;
                     break;
