@@ -10,9 +10,14 @@
 
 use crate::dict;
 use crate::randwrapper::{select_rand, RangeRng, ThreadRangeRng};
-use crate::utils::Rect;
+use crate::utils::{matching_char_count_ignore_case, Rect};
 
 const TITLE: &str = "FONV: Terminal Cracker";
+
+const _ASCII_ESC: char = 27 as char;
+const _ASCII_BACKSPACE: char = 8 as char;
+const _ASCII_DEL: char = 127 as char;
+const ASCII_ENTER: char = 10 as char;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Difficulty {
@@ -61,7 +66,7 @@ enum Movement {
 //#[derive(PartialEq, Eq)]
 enum InputCmd {
     Move(Movement),
-    _Select,
+    Select,
     Quit,
 }
 
@@ -188,15 +193,15 @@ fn refit_selection<S: AsRef<str>>(
         + selection.row_num * hex_dump_pane_dimensions.width() as usize
         + selection.col_start;
 
+    // TODO: clean up this implementation. It's a bit ugly
+    let mut result_selection = selection;
+
     // turn our list of words and word_offsets into a list of ranges where those words live
     // in the contiguous hex dump memory span
     let word_ranges = words
         .iter()
         .zip(word_offsets.iter())
         .map(|(word, word_offset)| (*word_offset, word_offset + word.as_ref().len()));
-
-    // TODO: clean up this implementation. It's a bit ugly
-    let mut result_selection = selection;
 
     for word_range in word_ranges {
         if cursor_index >= word_range.0 && cursor_index < word_range.1 {
@@ -223,6 +228,29 @@ fn refit_selection<S: AsRef<str>>(
     }
 
     result_selection
+}
+
+fn try_select_word<'a, S: AsRef<str>>(
+    selection: &SelectedChunk,
+    words: &'a [S],
+    word_offsets: &[usize],
+    hex_dump_pane_dimensions: &HexDumpPane,
+) -> Option<&'a str> {
+    let cursor_index = selection.pane_num * hex_dump_pane_dimensions.max_bytes_in_pane()
+        + selection.row_num * hex_dump_pane_dimensions.width() as usize
+        + selection.col_start;
+
+    for (word, word_offset) in words.iter().zip(word_offsets.iter()) {
+        if cursor_index >= *word_offset && cursor_index < word_offset + word.as_ref().len() {
+            // For safety we'll return the word if the cursor is anywhere in the word selection,
+            // but we only really expect it to be at the start of the word.
+            assert_eq!(cursor_index, *word_offset);
+            assert_eq!(selection.len, word.as_ref().len());
+            return Some(word.as_ref());
+        }
+    }
+
+    None
 }
 
 // TODO: this chunk render function is pretty nasty. can it be refactored better readability
@@ -324,6 +352,8 @@ fn render_game_window(
     hex_dump: &str,
     hex_dump_dimensions: &HexDumpPane,
     hex_dump_rects: &[Rect],
+    denied_selections: &[(&str, usize)],
+    accepted_selection: &Option<&str>,
 ) {
     // Render the hex dump header
     window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
@@ -360,6 +390,41 @@ fn render_game_window(
             highlighted_byte_range,
         );
     }
+
+    // Render the selection history
+    let mut row_cursor = window.get_max_y() - 5; // 5 provides a nice padding from the bottom
+    let selection_history_start_col = window.get_max_x() - 20; // 20 provides enough room for any selected word
+
+    let write_history_entries = |row: &mut i32, entries: &[&str]| {
+        for entry in entries.iter().rev() {
+            window.mvaddstr(*row, selection_history_start_col, format!(">{}", entry));
+            *row -= 1;
+        }
+    };
+
+    // first render the accepted solution if provided or the failure text if we've lost
+    window.attron(pancurses::A_BLINK);
+    if let Some(accepted_selection) = accepted_selection {
+        let lines = [
+            accepted_selection,
+            "Exact match!",
+            "Please wait",
+            "while system",
+            "is accessed.",
+        ];
+        write_history_entries(&mut row_cursor, &lines);
+    } else if denied_selections.len() == 4 {
+        let lines = ["TOO MANY ATTEMPTS!", "Entering secure", "lock mode"];
+        write_history_entries(&mut row_cursor, &lines);
+    }
+    window.attroff(pancurses::A_BLINK);
+
+    // now render each denied entry
+    for (denied_word, matching_char_count) in denied_selections.iter().rev() {
+        let char_count_str = format!("{}/{} correct.", matching_char_count, denied_word.len());
+        let lines = ["Entry denied", &char_count_str, denied_word];
+        write_history_entries(&mut row_cursor, &lines);
+    }
 }
 
 pub fn run_game(difficulty: Difficulty) {
@@ -394,6 +459,18 @@ pub fn run_game(difficulty: Difficulty) {
     // Generate a random set of words based on the provided difficulty setting
     let mut rng = ThreadRangeRng::new();
     let words = generate_words(difficulty, &mut rng);
+    let solution = select_rand(&words, &mut rng);
+
+    let mut denied_selections = Vec::new();
+    let mut accepted_selection = None;
+    fn is_game_over(
+        denied_selections: &[(&str, usize)],
+        accepted_selection: &Option<&str>,
+    ) -> bool {
+        denied_selections.len() == 4 || accepted_selection.is_some()
+    }
+    const GAME_OVER_HOLD_TIME: std::time::Duration = std::time::Duration::from_secs(3);
+    let mut game_over_timer = None;
 
     // Generate a mock hexdump from the randomly generated words
     const MAX_BYTES_IN_DUMP: usize = HEX_DUMP_PANE.max_bytes_in_pane() * 2; // 2 dump panes
@@ -434,7 +511,9 @@ pub fn run_game(difficulty: Difficulty) {
             Some(pancurses::Input::Character('a')) => Some(InputCmd::Move(Movement::Left)),
             Some(pancurses::Input::Character('d')) => Some(InputCmd::Move(Movement::Right)),
             Some(pancurses::Input::Character('q')) => Some(InputCmd::Quit),
-            // TODO: handle entering in guesses... Some(pancurses::Input::Character('ENTER')) => (),
+            Some(pancurses::Input::Character(ASCII_ENTER)) | Some(pancurses::Input::KeyEnter) => {
+                Some(InputCmd::Select)
+            }
             _ => None,
         };
 
@@ -451,7 +530,25 @@ pub fn run_game(difficulty: Difficulty) {
                 }
 
                 // Handle selecting a word
-                InputCmd::_Select => unimplemented!(),
+                InputCmd::Select => {
+                    if !is_game_over(&denied_selections, &accepted_selection) {
+                        let selected_word_result =
+                            try_select_word(&selected_chunk, &words, &word_offsets, &HEX_DUMP_PANE);
+                        if let Some(selected_word) = selected_word_result {
+                            if selected_word == solution {
+                                accepted_selection = Some(selected_word);
+                            } else {
+                                let matching_char_count =
+                                    matching_char_count_ignore_case(&solution, &selected_word);
+                                denied_selections.push((selected_word, matching_char_count));
+                            }
+                        }
+
+                        if is_game_over(&denied_selections, &accepted_selection) {
+                            game_over_timer = Some(std::time::Instant::now());
+                        }
+                    }
+                }
 
                 // Handle quitting the game early
                 InputCmd::Quit => break,
@@ -467,64 +564,21 @@ pub fn run_game(difficulty: Difficulty) {
             &hex_dump,
             &HEX_DUMP_PANE,
             &hex_dump_rects,
+            &denied_selections,
+            &accepted_selection,
         );
         window.refresh();
 
         // No need to waste cycles doing nothing but rendering over and over.
         // Yield the processor until the next frame.
         std::thread::sleep(std::time::Duration::from_millis(33));
-    }
-    pancurses::endwin();
 
-    // now let's run a mock game_loop
-    // run_game_from_line_console(&words, &mut rng);
-}
-
-fn _run_game_from_line_console(words: &[String], rng: &mut dyn RangeRng<usize>) {
-    // Select an answer
-    let solution = select_rand(words, rng);
-
-    println!("Solution: {}", solution);
-    for word in words {
-        let matching_char_count = crate::utils::matching_char_count_ignore_case(&solution, word);
-        println!("  {} ({}/{})", word, matching_char_count, solution.len());
-    }
-
-    // On each game loop iteration...
-    let mut remaining_guess_count = 4;
-    while remaining_guess_count > 0 {
-        // Let the user provide a guess
-        println!("\nGuess? ");
-        let next_guess: String = text_io::read!("{}");
-
-        // Check for a win
-        if &next_guess == solution {
+        // If the game is over and we've been staring at the screen for long enough exit
+        if game_over_timer.is_some() && game_over_timer.unwrap().elapsed() >= GAME_OVER_HOLD_TIME {
             break;
         }
-
-        // Validate the non-winning word in the guess list
-        // TODO: won't be necessary when they can only select from a preset set of words
-        if !words.iter().any(|w| w.eq_ignore_ascii_case(&next_guess)) {
-            println!("Not a word in the list!");
-            continue;
-        }
-
-        // Print the matching character count as a hint for the next guess
-        let matching_char_count =
-            crate::utils::matching_char_count_ignore_case(&solution, &next_guess);
-
-        println!("{} / {} chars match!", matching_char_count, solution.len());
-
-        // let the user know how many attempts they have left
-        remaining_guess_count -= 1;
-        println!("{} attempts left", remaining_guess_count);
     }
-
-    if remaining_guess_count > 0 {
-        println!("Correct!");
-    } else {
-        println!("Failed!");
-    }
+    pancurses::endwin();
 }
 
 #[cfg(test)]
