@@ -8,6 +8,10 @@ The plan is to extend it to also be able to play a clone of the cracking game.
 
 ## Game Demo Progress
 
+- [Support entering in words from the TUI and using that to power a full game loop](https://github.com/scottnm/fonv-cracker/commit/11a9bc4)
+
+![Game screen showing full game loop](demo/06-tui-game-loop.gif)
+
 - [Added cursor navigation and word selection to the TUI](https://github.com/scottnm/fonv-cracker/commit/1b7074c8)
 
 ![Game screen with showing cursor navigation and word selection](demo/05-tui-selection.gif)
