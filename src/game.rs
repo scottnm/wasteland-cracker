@@ -1,12 +1,11 @@
 // Work breakdown
 // - setup a better word selection algorithm which results in more common letters
-// - add support for using that selection instead of text input to power the gameloop
-// - add an output pane which tells you the results of your current selection
-// - refactor out tui utils into its own module
 
 // extensions/flavor
 // - use appropriate font to give it a "fallout feel"
+// - use appropriate animations to give it a "fallout feel"
 // - SFX
+// - refactor out tui utils into its own module
 
 use crate::dict;
 use crate::randwrapper::{select_rand, RangeRng, ThreadRangeRng};
