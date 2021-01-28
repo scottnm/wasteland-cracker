@@ -14,6 +14,8 @@ use crate::utils::{matching_char_count_ignore_case, Rect};
 
 const TITLE: &str = "FONV: Terminal Cracker";
 
+const MAX_ATTEMPTS: usize = 4;
+
 const _ASCII_ESC: char = 27 as char;
 const _ASCII_BACKSPACE: char = 8 as char;
 const _ASCII_DEL: char = 127 as char;
@@ -358,15 +360,23 @@ fn render_game_window(
     // Render the hex dump header
     window.mvaddstr(0, 0, "ROBCO INDUSTRIES (TM) TERMALINK PROTOCOL");
     window.mvaddstr(1, 0, "ENTER PASSWORD NOW");
-    const BLOCK_CHAR: char = '#';
-    window.mvaddstr(
-        3,
-        0,
-        format!(
-            "# ATTEMPT(S) LEFT: {} {} {} {}",
-            BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR, BLOCK_CHAR
-        ),
-    );
+
+    let attempts_left_title = "# ATTEMPT(S) LEFT:";
+    window.mvaddstr(3, 0, attempts_left_title);
+
+    let total_attempts = {
+        let mut attempts = denied_selections.len();
+        if accepted_selection.is_some() {
+            attempts += 1;
+        }
+        attempts
+    };
+
+    for i in 0..(MAX_ATTEMPTS - total_attempts) {
+        const BLOCK_CHAR_CHUNK: &str = " #";
+        let offset = attempts_left_title.len() + i * BLOCK_CHAR_CHUNK.len();
+        window.mvaddstr(3, offset as i32, BLOCK_CHAR_CHUNK);
+    }
 
     let highlighted_byte_range = {
         let start = cursor_selection.pane_num * hex_dump_dimensions.max_bytes_in_pane()
@@ -413,7 +423,7 @@ fn render_game_window(
             "is accessed.",
         ];
         write_history_entries(&mut row_cursor, &lines);
-    } else if denied_selections.len() == 4 {
+    } else if denied_selections.len() == MAX_ATTEMPTS {
         let lines = ["TOO MANY ATTEMPTS!", "Entering secure", "lock mode"];
         write_history_entries(&mut row_cursor, &lines);
     }
@@ -467,7 +477,7 @@ pub fn run_game(difficulty: Difficulty) {
         denied_selections: &[(&str, usize)],
         accepted_selection: &Option<&str>,
     ) -> bool {
-        denied_selections.len() == 4 || accepted_selection.is_some()
+        denied_selections.len() == MAX_ATTEMPTS || accepted_selection.is_some()
     }
     const GAME_OVER_HOLD_TIME: std::time::Duration = std::time::Duration::from_secs(3);
     let mut game_over_timer = None;
