@@ -1,5 +1,4 @@
 // Work breakdown
-// - setup a better word selection algorithm which results in more common letters
 
 // extensions/flavor
 // - use appropriate font to give it a "fallout feel"
