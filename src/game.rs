@@ -1,6 +1,8 @@
-// Work breakdown
-
-// extensions/flavor
+// Extended work breakdown
+// - add start screen
+// - make game and solver modes launchable from start screen
+// - add timed mode
+// - add extra game rules for handling selecting brackets?
 // - use appropriate font to give it a "fallout feel"
 // - use appropriate animations to give it a "fallout feel"
 // - SFX
