@@ -188,7 +188,7 @@ fn generate_words(
             Some(sorted_word_pair) => sorted_word_pair,
         };
 
-        if hamming_distance <= current_hd_distribution_entry.hamming_distance {
+        if hamming_distance >= current_hd_distribution_entry.hamming_distance {
             current_hd_distribution_entry.num_words -= 1;
             words.push(String::from(word));
 
@@ -728,11 +728,11 @@ mod tests {
         ];
 
         let expected_generated_words = [
-            goal_word, // hd 1
-            "dede",    // hd 2
-            "dodo", "rube", // hd 3
-            "door", "doom", "abba", // hd 4
-            "sick", "stop", "soil", "roll",
+            goal_word, // goal
+            "dede",    // hd 1
+            "dodo", "rube", // hd 2
+            "door", "doom", "abba", // hd 3
+            "sick", "stop", "soil", "roll", // hd 4
         ];
 
         let test_dict = dict::EnglishDictChunk::new_mock(4, &words);
