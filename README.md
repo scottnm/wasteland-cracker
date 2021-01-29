@@ -1,8 +1,14 @@
-# fonv-cracker
+# FONV Cracker
 
-Currently this tool is a helper utility for cracking fallout: new vegas terminals
+This program does two things:
 
-The plan is to extend it to also be able to play a clone of the cracking game.
+1. Originally, it was just a utility to help solve hacking puzzles in Fallout.
+
+   ![Animation of original solver utility](demo/08-original-solver.gif)
+
+2. Now it's also a standalone, simple TUI clone of the hacking puzzles in Fallout.
+
+   ![Demo showing improved word generation](demo/07-improved-word-generation.gif)
 
 ![Tests](https://github.com/scottnm/fonv-cracker/workflows/Tests/badge.svg)
 
@@ -35,3 +41,7 @@ The plan is to extend it to also be able to play a clone of the cracking game.
 - [Generating words](https://github.com/scottnm/fonv-cracker/commit/bf43b7ce1ba3e12ff41b8950f6de8fe6e9169a57)
 
 ![Animation of words being generated](demo/01-generate-words.gif)
+
+- [Original solver utility](https://github.com/scottnm/fonv-cracker/commit/2e15406)
+
+![Animation of original solver utility](demo/08-original-solver.gif)
