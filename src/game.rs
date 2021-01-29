@@ -12,7 +12,7 @@
 // - address all cleanup/refactoring todos
 
 use crate::dict;
-use crate::randwrapper::{select_rand, RangeRng, ThreadRangeRng};
+use crate::randwrapper::{RangeRng, ThreadRangeRng};
 use crate::utils::{matching_char_count_ignore_case, Rect};
 
 const TITLE: &str = "FONV: Terminal Cracker";
@@ -169,7 +169,7 @@ fn generate_words(
     dict_chunk: &dict::EnglishDictChunk,
     hd_distribution: &[HDDEntry; 4],
     rng: &mut dyn RangeRng<usize>,
-) -> Vec<String> {
+) -> (Vec<String>, String) {
     let total_words_in_distribution = hd_distribution.iter().fold(0, |acc, e| acc + e.num_words);
 
     let mut words = Vec::with_capacity(total_words_in_distribution + 1);
@@ -203,20 +203,24 @@ fn generate_words(
 
     // the code can manage finding fewer words, but this represents a bug
     assert_eq!(words.len(), total_words_in_distribution + 1);
+    (words, goal_word)
+}
 
-    let mut shuffled_words = Vec::with_capacity(words.len());
-    while !words.is_empty() {
-        let index = rng.gen_range(0, words.len());
-        shuffled_words.push(words.remove(index));
+fn simple_shuffle<T>(mut v: Vec<T>, rng: &mut dyn RangeRng<usize>) -> Vec<T> {
+    const NUM_SWAPS: usize = 100; // a good-enough heuristic for shuffling the words in place
+
+    for _ in 0..NUM_SWAPS {
+        let index = rng.gen_range(0, v.len());
+        v.swap(0, index);
     }
 
-    shuffled_words
+    v
 }
 
 fn generate_words_from_difficulty(
     difficulty: Difficulty,
     rng: &mut dyn RangeRng<usize>,
-) -> Vec<String> {
+) -> (Vec<String>, String) {
     let dict_chunk = dict::EnglishDictChunk::load(get_word_len_for_difficulty(difficulty));
     let hd_distribution = get_hamming_distance_distribution(difficulty);
     generate_words(&dict_chunk, &hd_distribution, rng)
@@ -557,9 +561,9 @@ pub fn run_game(difficulty: Difficulty) {
 
     // Generate a random set of words based on the provided difficulty setting
     let mut rng = ThreadRangeRng::new();
-    let words = generate_words_from_difficulty(difficulty, &mut rng);
-    assert_eq!(words.len(), 12); // the game isn't broken if we don't have 12 words but it represents a bug
-    let solution = select_rand(&words, &mut rng);
+    let (unshuffled_words, solution) = generate_words_from_difficulty(difficulty, &mut rng);
+    assert_eq!(unshuffled_words.len(), 12); // the game isn't broken if we don't have 12 words but it represents a bug
+    let words = simple_shuffle(unshuffled_words, &mut rng);
 
     let mut denied_selections = Vec::new();
     let mut accepted_selection = None;
@@ -688,9 +692,7 @@ mod tests {
 
     #[test]
     fn test_word_generation() {
-        // use a single-value rng for value 0. This will..
-        // 1. make sure the goal_word is the first word in the word list
-        // 2. make it predictable how the final word list will be shuffled (it won't be)
+        // use a single-value rng for value 0. This will make sure the goal_word is the first word in the original word list
         let mut rng = randwrapper::mocks::SingleValueRangeRng::new(0);
 
         let test_hd_distribution = [
@@ -739,8 +741,10 @@ mod tests {
         ];
 
         let test_dict = dict::EnglishDictChunk::new_mock(4, &words);
-        let generated_words = generate_words(&test_dict, &test_hd_distribution, &mut rng);
+        let (generated_words, solution) =
+            generate_words(&test_dict, &test_hd_distribution, &mut rng);
 
+        assert_eq!(solution, goal_word);
         assert_eq!(generated_words, expected_generated_words);
     }
 
