@@ -8,6 +8,10 @@ The plan is to extend it to also be able to play a clone of the cracking game.
 
 ## Game Demo Progress
 
+- [Improve the word generation so that in general our words are more similar and match more frequently](https://github.com/scottnm/fonv-cracker/commit/8693452)
+
+![Demo showing improved word generation](demo/07-improved-word-generation.gif)
+
 - [Support entering in words from the TUI and using that to power a full game loop](https://github.com/scottnm/fonv-cracker/commit/11a9bc4)
 
 ![Game screen showing full game loop](demo/06-tui-game-loop.gif)
