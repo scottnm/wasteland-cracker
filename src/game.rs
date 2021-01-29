@@ -7,6 +7,9 @@
 // - use appropriate animations to give it a "fallout feel"
 // - SFX
 // - refactor out tui utils into its own module
+// - improve TUI navigation logic to be more intuitive
+// - refactor different components into modules
+// - address all cleanup/refactoring todos
 
 use crate::dict;
 use crate::randwrapper::{select_rand, RangeRng, ThreadRangeRng};
@@ -152,7 +155,6 @@ fn get_hamming_distance_distribution(difficulty: Difficulty) -> [HDDEntry; 4] {
     ]
 }
 
-// TODO: add difficulty test to make sure this stays in line with the hdd distribution
 fn get_word_len_for_difficulty(difficulty: Difficulty) -> usize {
     match difficulty {
         Difficulty::VeryEasy => 4,
@@ -1172,5 +1174,25 @@ mod tests {
         );
 
         assert_eq!(end_selection, expected_end_selection);
+    }
+
+    #[test]
+    fn ensure_word_len_for_difficulty_matches_hamming_distance_distribution_for_difficulty() {
+        let difficulties = [
+            Difficulty::VeryEasy,
+            Difficulty::Easy,
+            Difficulty::Average,
+            Difficulty::Hard,
+            Difficulty::VeryHard,
+        ];
+
+        for d in &difficulties {
+            let word_len = get_word_len_for_difficulty(*d);
+            let hamming_distance_distribution = get_hamming_distance_distribution(*d);
+
+            for hdd_entry in &hamming_distance_distribution {
+                assert!(hdd_entry.hamming_distance <= word_len);
+            }
+        }
     }
 }
