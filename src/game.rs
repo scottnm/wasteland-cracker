@@ -115,21 +115,108 @@ struct SelectedChunk {
     len: usize,
 }
 
-fn generate_words(difficulty: Difficulty, rng: &mut dyn RangeRng<usize>) -> Vec<String> {
-    let word_len = match difficulty {
+// H_amming D_istance D_istribution Entry
+#[derive(Clone, Copy)]
+struct HDDEntry {
+    num_words: usize, // the number of words to look for with this hamming distance
+    hamming_distance: usize, // the hamming distance to look for
+}
+
+fn get_hamming_distance_distribution(difficulty: Difficulty) -> [HDDEntry; 4] {
+    let distances = match difficulty {
+        Difficulty::VeryEasy => [1, 2, 3, 4],
+        Difficulty::Easy => [1, 3, 4, 5],
+        Difficulty::Average => [1, 3, 5, 7],
+        Difficulty::Hard => [1, 4, 6, 9],
+        Difficulty::VeryHard => [1, 3, 7, 10],
+    };
+
+    [
+        HDDEntry {
+            num_words: 1,
+            hamming_distance: distances[0],
+        },
+        HDDEntry {
+            num_words: 2,
+            hamming_distance: distances[1],
+        },
+        HDDEntry {
+            num_words: 3,
+            hamming_distance: distances[2],
+        },
+        HDDEntry {
+            num_words: 5,
+            hamming_distance: distances[3],
+        },
+    ]
+}
+
+// TODO: add difficulty test to make sure this stays in line with the hdd distribution
+fn get_word_len_for_difficulty(difficulty: Difficulty) -> usize {
+    match difficulty {
         Difficulty::VeryEasy => 4,
         Difficulty::Easy => 6,
         Difficulty::Average => 8,
         Difficulty::Hard => 10,
         Difficulty::VeryHard => 12,
-    };
+    }
+}
 
-    const WORDS_TO_GENERATE_COUNT: usize = 12;
+fn generate_words(
+    dict_chunk: &dict::EnglishDictChunk,
+    hd_distribution: &[HDDEntry; 4],
+    rng: &mut dyn RangeRng<usize>,
+) -> Vec<String> {
+    let total_words_in_distribution = hd_distribution.iter().fold(0, |acc, e| acc + e.num_words);
 
-    let dict_chunk = dict::EnglishDictChunk::load(word_len);
-    (0..WORDS_TO_GENERATE_COUNT)
-        .map(|_| dict_chunk.get_random_word(rng))
-        .collect()
+    let mut words = Vec::with_capacity(total_words_in_distribution + 1);
+    let goal_word = dict_chunk.get_random_word(rng);
+    words.push(goal_word.clone());
+
+    let mut current_hd_distribution_index = 0;
+    let mut hd_distribution_tracker: [HDDEntry; 4] = hd_distribution.clone();
+    let mut hamming_distance_sorted_iter = dict_chunk.get_hamming_distance_sorted_words(&goal_word);
+
+    while current_hd_distribution_index < hd_distribution_tracker.len() {
+        let current_hd_distribution_entry =
+            &mut hd_distribution_tracker[current_hd_distribution_index];
+        assert_ne!(current_hd_distribution_entry.num_words, 0);
+
+        let next_sorted_word_pair = hamming_distance_sorted_iter.next();
+        let (word, hamming_distance) = match next_sorted_word_pair {
+            None => break, // we are out of words!
+            Some(sorted_word_pair) => sorted_word_pair,
+        };
+
+        if hamming_distance <= current_hd_distribution_entry.hamming_distance {
+            current_hd_distribution_entry.num_words -= 1;
+            words.push(String::from(word));
+
+            if current_hd_distribution_entry.num_words == 0 {
+                current_hd_distribution_index += 1;
+            }
+        }
+    }
+
+    // the code can manage finding fewer words, but this represents a bug
+    assert_eq!(words.len(), total_words_in_distribution + 1);
+
+    let mut shuffled_words = Vec::with_capacity(words.len());
+    while !words.is_empty() {
+        let index = rng.gen_range(0, words.len());
+        shuffled_words.push(words.remove(index));
+    }
+
+    shuffled_words
+}
+
+fn generate_words_from_difficulty(
+    difficulty: Difficulty,
+    rng: &mut dyn RangeRng<usize>,
+) -> Vec<String> {
+    let dict_chunk = dict::EnglishDictChunk::load(get_word_len_for_difficulty(difficulty));
+    let hd_distribution = get_hamming_distance_distribution(difficulty);
+    generate_words(&dict_chunk, &hd_distribution, rng)
 }
 
 fn move_selection(
@@ -467,7 +554,8 @@ pub fn run_game(difficulty: Difficulty) {
 
     // Generate a random set of words based on the provided difficulty setting
     let mut rng = ThreadRangeRng::new();
-    let words = generate_words(difficulty, &mut rng);
+    let words = generate_words_from_difficulty(difficulty, &mut rng);
+    assert_eq!(words.len(), 12); // the game isn't broken if we don't have 12 words but it represents a bug
     let solution = select_rand(&words, &mut rng);
 
     let mut denied_selections = Vec::new();
@@ -597,38 +685,60 @@ mod tests {
 
     #[test]
     fn test_word_generation() {
-        let mut rng = randwrapper::mocks::SequenceRangeRng::new(&[0, 2, 4, 7]);
-        let tests = [
-            (Difficulty::VeryEasy, ["aahs", "aani", "abac", "abba"]),
-            (Difficulty::Easy, ["aahing", "aarrgh", "abacay", "abacot"]),
-            (
-                Difficulty::Average,
-                ["aardvark", "aaronite", "abacisci", "abacuses"],
-            ),
-            (
-                Difficulty::Hard,
-                ["aardwolves", "abalienate", "abandoning", "abaptistum"],
-            ),
-            (
-                Difficulty::VeryHard,
-                [
-                    "abalienating",
-                    "abandonments",
-                    "abbreviately",
-                    "abbreviatory",
-                ],
-            ),
+        // use a single-value rng for value 0. This will..
+        // 1. make sure the goal_word is the first word in the word list
+        // 2. make it predictable how the final word list will be shuffled (it won't be)
+        let mut rng = randwrapper::mocks::SingleValueRangeRng::new(0);
+
+        let test_hd_distribution = [
+            HDDEntry {
+                num_words: 1,
+                hamming_distance: 1,
+            },
+            HDDEntry {
+                num_words: 2,
+                hamming_distance: 2,
+            },
+            HDDEntry {
+                num_words: 3,
+                hamming_distance: 3,
+            },
+            HDDEntry {
+                num_words: 4,
+                hamming_distance: 4,
+            },
         ];
 
-        for (difficulty, expected_words) in &tests {
-            let generated_words = generate_words(*difficulty, &mut rng);
-            let expected_word_cnt = 12;
-            for i in 0..expected_word_cnt {
-                let generated_word = &generated_words[i];
-                let expected_word = expected_words[i % expected_words.len()];
-                assert_eq!(generated_word, expected_word);
-            }
-        }
+        let goal_word = "dude";
+        let words = [
+            goal_word, // 0
+            "dede",    // 1
+            "door",    // 3
+            "dodo",    // 2
+            "doom",    // 3
+            "abba",    // 4
+            "rude",    // 1
+            "duds",    // 1
+            "rube",    // 2
+            "cube",    // 2
+            "sick",    // 4
+            "stop",    // 4
+            "soil",    // 4
+            "roll",    // 4
+        ];
+
+        let expected_generated_words = [
+            goal_word, // hd 1
+            "dede",    // hd 2
+            "dodo", "rube", // hd 3
+            "door", "doom", "abba", // hd 4
+            "sick", "stop", "soil", "roll",
+        ];
+
+        let test_dict = dict::EnglishDictChunk::new_mock(4, &words);
+        let generated_words = generate_words(&test_dict, &test_hd_distribution, &mut rng);
+
+        assert_eq!(generated_words, expected_generated_words);
     }
 
     #[test]

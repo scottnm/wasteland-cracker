@@ -17,7 +17,7 @@ pub struct HammingDistanceIterator<'a> {
 
 impl EnglishDictChunk {
     #[cfg(test)]
-    fn new_mock(word_len: usize, word_set: &[&str]) -> Self {
+    pub fn new_mock(word_len: usize, word_set: &[&str]) -> Self {
         assert!(word_set.iter().all(|w| w.len() == word_len));
         EnglishDictChunk {
             word_len,
