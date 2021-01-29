@@ -1,5 +1,7 @@
 # FONV Cracker
 
+![Tests](https://github.com/scottnm/fonv-cracker/workflows/Tests/badge.svg)
+
 This program does two things:
 
 1. Originally, it was just a utility to help solve hacking puzzles in Fallout.
@@ -9,8 +11,6 @@ This program does two things:
 2. Now it's also a standalone, simple TUI clone of the hacking puzzles in Fallout.
 
    ![Demo showing improved word generation](demo/07-improved-word-generation.gif)
-
-![Tests](https://github.com/scottnm/fonv-cracker/workflows/Tests/badge.svg)
 
 ## Game Demo Progress
 
