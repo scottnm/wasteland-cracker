@@ -94,26 +94,6 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         input_passwords = filter_matching_passwords(&known_guess, input_passwords);
     }
 
-    /* FIXME:
-    while remaining_passwords.len() > 1 {
-        println!("Remaining passwords:");
-        for p in &remaining_passwords {
-            println!("    {}", p);
-        }
-
-        let guess_word: String = text_io::read!("{}");
-        let guess_char_count: usize = text_io::read!("{}");
-        let next_guess = KnownGuess::new(&guess_word, guess_char_count);
-        if !remaining_passwords.contains(&next_guess.word) {
-            println!("{} was not found in password list!", next_guess.word);
-            continue;
-        }
-
-        remaining_passwords = filter_matching_passwords(&next_guess, remaining_passwords);
-        known_guesses.push(next_guess);
-    }
-    */
-
     let mut menu_cursor: i32 = 0;
     let cursor_prefix = "> ";
     let cursor_prefix_len = cursor_prefix.len() as i32;
