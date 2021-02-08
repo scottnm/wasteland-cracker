@@ -63,7 +63,7 @@ where
 }
 
 pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Window) {
-    let input_passwords = {
+    let mut input_passwords = {
         let pwds: Vec<String> = snm_simple_file::read_lines(&password_file).collect();
         match validate_input_passwords(pwds) {
             Ok(validated_pwds) => validated_pwds,
@@ -90,9 +90,8 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         }
     }
 
-    let mut remaining_passwords = input_passwords.clone();
     for known_guess in &known_guesses {
-        remaining_passwords = filter_matching_passwords(&known_guess, remaining_passwords);
+        input_passwords = filter_matching_passwords(&known_guess, input_passwords);
     }
 
     /* FIXME:
@@ -118,14 +117,14 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
     let mut menu_cursor: i32 = 0;
     let cursor_prefix = "> ";
     let cursor_prefix_len = cursor_prefix.len() as i32;
-    let word_column_width = remaining_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
+    let word_column_width = input_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
     let padding_width = 4;
     let char_count_column_width = 2; // 00
 
     let menu_rect = {
         let menu_width =
             cursor_prefix_len + word_column_width + padding_width + char_count_column_width;
-        let menu_height = remaining_passwords.len() as i32;
+        let menu_height = input_passwords.len() as i32;
 
         Rect {
             // center the menu options horizontally
@@ -137,15 +136,53 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         }
     };
 
+    let mut potential_password_refresh_needed = true;
+    let mut clear_on_next_number_input = true;
+    let mut number_input_buffers = vec![String::new(); input_passwords.len()];
+
     loop {
         // Input handling
         // TODO: I think this input system might need some refactoring to share with the start menu
         if let Some(pancurses::Input::Character(ch)) = window.getch() {
             match ch {
                 // check for movement inputs
-                'w' => menu_cursor = std::cmp::max(0, menu_cursor - 1),
+                'w' => {
+                    menu_cursor = std::cmp::max(0, menu_cursor - 1);
+                    potential_password_refresh_needed = true;
+                    clear_on_next_number_input = true;
+                }
                 's' => {
-                    menu_cursor = std::cmp::min(remaining_passwords.len() as i32, menu_cursor + 1)
+                    menu_cursor = std::cmp::min(input_passwords.len() as i32, menu_cursor + 1);
+                    potential_password_refresh_needed = true;
+                    clear_on_next_number_input = true;
+                }
+                keys::ASCII_ENTER => {
+                    if menu_cursor == input_passwords.len() as i32 {
+                        break;
+                    } else {
+                        potential_password_refresh_needed = true;
+                        clear_on_next_number_input = true;
+                    }
+                }
+                '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+                    let menu_idx = menu_cursor as usize;
+                    if menu_idx < input_passwords.len() {
+                        let number_input_buffer = &mut number_input_buffers[menu_idx];
+                        if clear_on_next_number_input {
+                            clear_on_next_number_input = false;
+                            *number_input_buffer = String::new();
+                        }
+
+                        if number_input_buffer.len() < 2 {
+                            number_input_buffer.push(ch);
+                        }
+                    }
+                }
+                keys::ASCII_BACKSPACE | keys::ASCII_DEL => {
+                    let menu_idx = menu_cursor as usize;
+                    if menu_idx < input_passwords.len() {
+                        number_input_buffers[menu_idx].pop();
+                    }
                 }
                 keys::ASCII_ESC => break,
                 _ => (),
@@ -154,18 +191,24 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
 
         window.erase();
 
-        for (i, pwd) in remaining_passwords.iter().enumerate() {
+        for (i, pwd) in input_passwords.iter().enumerate() {
             let row = i as i32 + menu_rect.top;
             let col_offset = menu_rect.left + cursor_prefix_len;
             window.mvaddstr(row, col_offset, pwd);
+
+            let max_number_width = 2;
+            let number_input_buffer = &number_input_buffers[i];
+
+            window.attron(pancurses::A_UNDERLINE);
             window.mvaddstr(
                 row,
                 col_offset + menu_rect.width - char_count_column_width,
-                "00",
+                format!("{:>2}", number_input_buffer),
             );
+            window.attroff(pancurses::A_UNDERLINE);
         }
 
-        let back_button_row = menu_rect.top + (remaining_passwords.len() + 1) as i32;
+        let back_button_row = menu_rect.top + (input_passwords.len() + 1) as i32;
         let back_button_text = "[ Back ]";
         window.mvaddstr(
             back_button_row,
@@ -173,7 +216,7 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
             back_button_text,
         );
 
-        if (menu_cursor as usize) < remaining_passwords.len() {
+        if (menu_cursor as usize) < input_passwords.len() {
             let cursor_row = menu_rect.top + menu_cursor;
             window.mvaddstr(cursor_row, menu_rect.left, cursor_prefix);
             window.mvchgat(
@@ -184,7 +227,7 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
                 0,
             );
         } else {
-            assert_eq!(menu_cursor as usize, remaining_passwords.len());
+            assert_eq!(menu_cursor as usize, input_passwords.len());
             window.mvchgat(
                 back_button_row,
                 menu_rect.left + cursor_prefix_len,
@@ -200,14 +243,6 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         // Yield the processor until the next frame.
         std::thread::sleep(std::time::Duration::from_millis(33));
     }
-
-    /* FIXME:
-    match &remaining_passwords[..] {
-        [] => println!("No solution matched the provided guesses!"),
-        [solution] => println!("The password is... {}", solution),
-        _ => (),
-    };
-    */
 }
 
 #[cfg(test)]
