@@ -136,11 +136,43 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         }
     };
 
-    let mut potential_password_refresh_needed = true;
+    let mut refresh_filtered_passwords = true;
     let mut clear_on_next_number_input = true;
     let mut number_input_buffers = vec![String::new(); input_passwords.len()];
+    let mut filtered_input_passwords = Vec::new();
 
     loop {
+        if refresh_filtered_passwords {
+            refresh_filtered_passwords = false;
+
+            fn xform_password_tuple_to_known_guess(
+                (pwd, matching_char_count_string): (&String, &String),
+            ) -> KnownGuess {
+                KnownGuess {
+                    word: pwd.clone(),
+                    char_count: matching_char_count_string.parse().unwrap(),
+                }
+            }
+
+            fn require_non_empty_number_buffers(
+                (_, matching_char_count_string): &(&String, &String),
+            ) -> bool {
+                !matching_char_count_string.is_empty()
+            }
+
+            let known_guesses = input_passwords
+                .iter()
+                .zip(number_input_buffers.iter())
+                .filter(require_non_empty_number_buffers)
+                .map(xform_password_tuple_to_known_guess);
+
+            filtered_input_passwords = input_passwords.clone();
+            for guess in known_guesses {
+                filtered_input_passwords =
+                    filter_matching_passwords(&guess, filtered_input_passwords);
+            }
+        }
+
         // Input handling
         // TODO: I think this input system might need some refactoring to share with the start menu
         if let Some(pancurses::Input::Character(ch)) = window.getch() {
@@ -148,19 +180,19 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
                 // check for movement inputs
                 'w' => {
                     menu_cursor = std::cmp::max(0, menu_cursor - 1);
-                    potential_password_refresh_needed = true;
+                    refresh_filtered_passwords = true;
                     clear_on_next_number_input = true;
                 }
                 's' => {
                     menu_cursor = std::cmp::min(input_passwords.len() as i32, menu_cursor + 1);
-                    potential_password_refresh_needed = true;
+                    refresh_filtered_passwords = true;
                     clear_on_next_number_input = true;
                 }
                 keys::ASCII_ENTER => {
                     if menu_cursor == input_passwords.len() as i32 {
                         break;
                     } else {
-                        potential_password_refresh_needed = true;
+                        refresh_filtered_passwords = true;
                         clear_on_next_number_input = true;
                     }
                 }
@@ -192,20 +224,21 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         window.erase();
 
         for (i, pwd) in input_passwords.iter().enumerate() {
+            if !filtered_input_passwords.contains(pwd) {
+                window.attron(pancurses::A_DIM);
+            }
             let row = i as i32 + menu_rect.top;
             let col_offset = menu_rect.left + cursor_prefix_len;
             window.mvaddstr(row, col_offset, pwd);
-
-            let max_number_width = 2;
-            let number_input_buffer = &number_input_buffers[i];
 
             window.attron(pancurses::A_UNDERLINE);
             window.mvaddstr(
                 row,
                 col_offset + menu_rect.width - char_count_column_width,
-                format!("{:>2}", number_input_buffer),
+                format!("{:>2}", number_input_buffers[i]),
             );
             window.attroff(pancurses::A_UNDERLINE);
+            window.attroff(pancurses::A_DIM);
         }
 
         let back_button_row = menu_rect.top + (input_passwords.len() + 1) as i32;
