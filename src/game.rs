@@ -1,5 +1,6 @@
 // Extended work breakdown
 // - async dict load to hide loading times
+// - support a better interface for providing the input to the solver
 // - add timed mode
 // - add extra game rules for handling selecting brackets?
 // - use appropriate font to give it a "fallout feel"

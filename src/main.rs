@@ -220,7 +220,6 @@ fn run_full_gui(window: &pancurses::Window) {
                 game::run_game(difficulty, &window);
                 Some(Screen::StartMenu)
             }
-            // FIXME: make the input file
             Screen::Solver => {
                 solver::solver("src/input.txt", &Vec::new(), &window);
                 Some(Screen::StartMenu)
