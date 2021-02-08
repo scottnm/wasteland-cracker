@@ -596,7 +596,7 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
             Some(pancurses::Input::Character('s')) => Some(InputCmd::Move(Movement::Down)),
             Some(pancurses::Input::Character('a')) => Some(InputCmd::Move(Movement::Left)),
             Some(pancurses::Input::Character('d')) => Some(InputCmd::Move(Movement::Right)),
-            Some(pancurses::Input::Character('q')) => Some(InputCmd::Quit),
+            Some(pancurses::Input::Character(keys::ASCII_ESC)) => Some(InputCmd::Quit),
             Some(pancurses::Input::Character(keys::ASCII_ENTER))
             | Some(pancurses::Input::KeyEnter) => Some(InputCmd::Select),
             _ => None,
@@ -663,7 +663,6 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
             break;
         }
     }
-    pancurses::endwin();
 }
 
 #[cfg(test)]

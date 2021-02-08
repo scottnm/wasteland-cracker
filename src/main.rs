@@ -200,10 +200,12 @@ fn main() {
 
     match args.mode {
         Mode::LaunchGame(difficulty) => {
-            game::run_game(difficulty, &utils::setup_pancurses_window(TITLE))
+            let window = utils::setup_pancurses_window(TITLE);
+            game::run_game(difficulty, &window);
+            pancurses::endwin();
         }
         Mode::LaunchSolver(input_password_file, known_guess_args) => {
-            solver::solver(&input_password_file, &known_guess_args)
+            solver::solver(&input_password_file, &known_guess_args);
         }
         Mode::LaunchGui => run_full_gui(),
     }

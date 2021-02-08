@@ -46,7 +46,7 @@ pub fn setup_pancurses_window(title: &str) -> pancurses::Window {
 }
 
 pub mod keys {
-    pub const _ASCII_ESC: char = 27 as char;
+    pub const ASCII_ESC: char = 27 as char;
     pub const _ASCII_BACKSPACE: char = 8 as char;
     pub const _ASCII_DEL: char = 127 as char;
     pub const ASCII_ENTER: char = 10 as char;
