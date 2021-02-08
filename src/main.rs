@@ -115,14 +115,14 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
         None,
     ];
 
-    let selected_menu_option_prefix = "> ";
+    let cursor_prefix = "> ";
     let menu_rect = {
         let max_menu_option_width = MENU_OPTIONS
             .iter()
             .map(|option_text| option_text.len())
             .max()
             .unwrap() as i32;
-        let menu_width = max_menu_option_width + selected_menu_option_prefix.len() as i32;
+        let menu_width = max_menu_option_width + cursor_prefix.len() as i32;
         const MENU_HEIGHT: i32 = MENU_OPTIONS.len() as i32;
 
         Rect {
@@ -152,11 +152,11 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
         for (i, menu_line) in MENU_OPTIONS.iter().enumerate() {
             let row_offset = (i as i32) + menu_rect.top;
             if i == menu_cursor {
-                window.mvaddstr(row_offset, menu_rect.left, selected_menu_option_prefix);
+                window.mvaddstr(row_offset, menu_rect.left, cursor_prefix);
             }
             window.mvaddstr(
                 row_offset,
-                menu_rect.left + selected_menu_option_prefix.len() as i32,
+                menu_rect.left + cursor_prefix.len() as i32,
                 menu_line,
             );
         }

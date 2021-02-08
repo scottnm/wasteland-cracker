@@ -1,5 +1,7 @@
 use crate::dict;
 
+use crate::utils::{keys, Rect};
+
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
     InputEmpty,
@@ -69,7 +71,7 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
         }
     };
 
-    let mut known_guesses = {
+    let known_guesses = {
         let mut known_guesses = Vec::new();
         for guess_slice in guess_args.chunks(2) {
             let guess_word = &guess_slice[0];
@@ -113,17 +115,68 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
     }
     */
 
+    let mut menu_cursor: i32 = 0;
+    let cursor_prefix = "> ";
+    let word_column_width = remaining_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
+
+    let menu_rect = {
+        let menu_width = word_column_width + cursor_prefix.len() as i32;
+        let menu_height = remaining_passwords.len() as i32;
+
+        Rect {
+            // center the menu options horizontally
+            left: (window.get_max_x() - menu_width) / 2,
+            // center the menu options vertically
+            top: (window.get_max_y() - menu_height) / 2,
+            width: menu_width,
+            height: menu_height,
+        }
+    };
+
     loop {
+        // Input handling
+        // TODO: I think this input system might need some refactoring to share with the start menu
+        if let Some(pancurses::Input::Character(ch)) = window.getch() {
+            match ch {
+                // check for movement inputs
+                'w' => menu_cursor = std::cmp::max(0, menu_cursor - 1),
+                's' => {
+                    menu_cursor = std::cmp::min(remaining_passwords.len() as i32, menu_cursor + 1)
+                }
+                keys::ASCII_ESC => break,
+                _ => (),
+            }
+        };
+
         window.erase();
 
         let word_column_width = remaining_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
         for (i, pwd) in remaining_passwords.iter().enumerate() {
             let row = i as i32;
-            window.mvaddstr(row, 0, pwd);
-            window.mvaddstr(row, word_column_width + 4, "__");
+            window.mvaddstr(row, cursor_prefix.len() as i32, pwd);
+            window.mvaddstr(
+                row,
+                cursor_prefix.len() as i32 + word_column_width + 4,
+                "00",
+            );
         }
+
         let back_button_row = (remaining_passwords.len() + 2) as i32;
-        window.mvaddstr(back_button_row, 0, "[ Back ]");
+        let back_button_text = "[ Back ]";
+        window.mvaddstr(back_button_row, 0, back_button_text);
+
+        if (menu_cursor as usize) < remaining_passwords.len() {
+            window.mvaddstr(menu_cursor, 0, cursor_prefix);
+        } else {
+            assert_eq!(menu_cursor as usize, remaining_passwords.len());
+            window.mvchgat(
+                back_button_row,
+                0,
+                back_button_text.len() as i32,
+                pancurses::A_BLINK,
+                0,
+            );
+        }
 
         window.refresh();
 
