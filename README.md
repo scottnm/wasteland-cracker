@@ -1,4 +1,6 @@
-# FONV Cracker
+![Image of Wasteland Cracker logo](misc/title_graphic.png)
+
+# Wasteland Cracker
 
 ![Tests](https://github.com/scottnm/fonv-cracker/workflows/Tests/badge.svg)
 
@@ -6,7 +8,7 @@ This program does two things:
 
 1. Originally, it was just a utility to help solve hacking puzzles in Fallout.
 
-   ![Animation of original solver utility](demo/08-original-solver.gif)
+   ![Animation of original solver utility](demo/09-gui-solver.gif)
 
 2. Now it's also a standalone, simple TUI clone of the hacking puzzles in Fallout.
 
