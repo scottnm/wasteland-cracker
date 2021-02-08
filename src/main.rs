@@ -73,13 +73,13 @@ enum Screen {
 
 fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
     const TITLE_LINES: [&str; 7] = [
-        r#"  _      __         __      __             __"#,
-        r#" | | /| / /__ ____ / /____ / /__ ____  ___/ /"#,
-        r#" | |/ |/ / _ `(_-</ __/ -_) / _ `/ _ \/ _  /"#,
-        r#" |__/|__/\_,_/___/\__/\__/_/\_,_/_//_/\_,_/"#,
-        r#" / ___/______ _____/ /_____ ____"#,
-        r#"/ /__/ __/ _ `/ __/  '_/ -_) __/"#,
-        r#"\___/_/  \_,_/\__/_/\_\\__/_/"#,
+        r#" _      __         __      __             __"#,
+        r#"| | /| / /__ ____ / /____ / /__ ____  ___/ /"#,
+        r#"| |/ |/ / _ `(_-</ __/ -_) / _ `/ _ \/ _  /"#,
+        r#"|__/|__/\_,_/___/\__/\__/_/\_,_/_//_/\_,_/"#,
+        r#"      / ___/______ _____/ /_____ ____"#,
+        r#"     / /__/ __/ _ `/ __/  '_/ -_) __/"#,
+        r#"     \___/_/  \_,_/\__/_/\_\\__/_/"#,
     ];
 
     let (window_height, window_width) = window.get_max_yx();
@@ -115,12 +115,14 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
         None,
     ];
 
+    let selected_menu_option_prefix = "> ";
     let menu_rect = {
-        let menu_width = MENU_OPTIONS
+        let max_menu_option_width = MENU_OPTIONS
             .iter()
             .map(|option_text| option_text.len())
             .max()
             .unwrap() as i32;
+        let menu_width = max_menu_option_width + selected_menu_option_prefix.len() as i32;
         const MENU_HEIGHT: i32 = MENU_OPTIONS.len() as i32;
 
         Rect {
@@ -128,8 +130,7 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
             left: (window_width - menu_width) / 2,
             // place the menu options just below the horizontal divide
             top: (window_height / 2) + 1,
-            // Add 2 characters to the menu width to account for the cursor
-            width: menu_width + 2,
+            width: menu_width,
             height: MENU_HEIGHT,
         }
     };
@@ -151,9 +152,13 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
         for (i, menu_line) in MENU_OPTIONS.iter().enumerate() {
             let row_offset = (i as i32) + menu_rect.top;
             if i == menu_cursor {
-                window.mvaddstr(row_offset, menu_rect.left, "> ");
+                window.mvaddstr(row_offset, menu_rect.left, selected_menu_option_prefix);
             }
-            window.mvaddstr(row_offset, menu_rect.left + 2, menu_line);
+            window.mvaddstr(
+                row_offset,
+                menu_rect.left + selected_menu_option_prefix.len() as i32,
+                menu_line,
+            );
         }
 
         // Input handling
