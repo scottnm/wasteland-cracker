@@ -118,9 +118,14 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
     let mut menu_cursor: i32 = 0;
     let cursor_prefix = "> ";
     let word_column_width = remaining_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
+    let padding_width = 4;
+    let char_count_column_width = 2; // 00
 
     let menu_rect = {
-        let menu_width = word_column_width + cursor_prefix.len() as i32;
+        let menu_width = (cursor_prefix.len() as i32)
+            + word_column_width
+            + padding_width
+            + char_count_column_width;
         let menu_height = remaining_passwords.len() as i32;
 
         Rect {
@@ -150,28 +155,32 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
 
         window.erase();
 
-        let word_column_width = remaining_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
         for (i, pwd) in remaining_passwords.iter().enumerate() {
-            let row = i as i32;
-            window.mvaddstr(row, cursor_prefix.len() as i32, pwd);
+            let row = i as i32 + menu_rect.top;
+            let col_offset = menu_rect.left + cursor_prefix.len() as i32;
+            window.mvaddstr(row, col_offset, pwd);
             window.mvaddstr(
                 row,
-                cursor_prefix.len() as i32 + word_column_width + 4,
+                col_offset + menu_rect.width - char_count_column_width,
                 "00",
             );
         }
 
-        let back_button_row = (remaining_passwords.len() + 2) as i32;
+        let back_button_row = menu_rect.top + (remaining_passwords.len() + 2) as i32;
         let back_button_text = "[ Back ]";
-        window.mvaddstr(back_button_row, 0, back_button_text);
+        window.mvaddstr(
+            back_button_row,
+            menu_rect.left + cursor_prefix.len() as i32,
+            back_button_text,
+        );
 
         if (menu_cursor as usize) < remaining_passwords.len() {
-            window.mvaddstr(menu_cursor, 0, cursor_prefix);
+            window.mvaddstr(menu_rect.top + menu_cursor, menu_rect.left, cursor_prefix);
         } else {
             assert_eq!(menu_cursor as usize, remaining_passwords.len());
             window.mvchgat(
                 back_button_row,
-                0,
+                menu_rect.left + cursor_prefix.len() as i32,
                 back_button_text.len() as i32,
                 pancurses::A_BLINK,
                 0,
