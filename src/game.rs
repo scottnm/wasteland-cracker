@@ -1,6 +1,4 @@
 // Extended work breakdown
-// - add start screen
-// - make game and solver modes launchable from start screen
 // - add timed mode
 // - add extra game rules for handling selecting brackets?
 // - use appropriate font to give it a "fallout feel"
@@ -13,16 +11,9 @@
 
 use crate::dict;
 use crate::randwrapper::{RangeRng, ThreadRangeRng};
-use crate::utils::{matching_char_count_ignore_case, Rect};
-
-const TITLE: &str = "FONV: Terminal Cracker";
+use crate::utils::{keys, matching_char_count_ignore_case, Rect};
 
 const MAX_ATTEMPTS: usize = 4;
-
-const _ASCII_ESC: char = 27 as char;
-const _ASCII_BACKSPACE: char = 8 as char;
-const _ASCII_DEL: char = 127 as char;
-const ASCII_ENTER: char = 10 as char;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Difficulty {
@@ -530,7 +521,7 @@ fn render_game_window(
     }
 }
 
-pub fn run_game(difficulty: Difficulty) {
+pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
     const HEX_DUMP_PANE: HexDumpPane = HexDumpPane {
         dump_width: 12,  // 12 characters per row of the hexdump
         dump_height: 16, // 16 rows of hex dump per dump pane
@@ -597,15 +588,6 @@ pub fn run_game(difficulty: Difficulty) {
     // Immediately refit the selection in case the first character is part of a larger word
     selected_chunk = refit_selection(selected_chunk, &words, &word_offsets, &HEX_DUMP_PANE);
 
-    // setup the window
-    let window = pancurses::initscr();
-    pancurses::noecho(); // prevent key inputs rendering to the screen
-    pancurses::cbreak();
-    pancurses::curs_set(0);
-    pancurses::set_title(TITLE);
-    window.nodelay(true); // don't block waiting for key inputs (we'll poll)
-    window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
-
     // TODO: refactor this loop for readability and testing
     loop {
         // Poll for input
@@ -615,9 +597,8 @@ pub fn run_game(difficulty: Difficulty) {
             Some(pancurses::Input::Character('a')) => Some(InputCmd::Move(Movement::Left)),
             Some(pancurses::Input::Character('d')) => Some(InputCmd::Move(Movement::Right)),
             Some(pancurses::Input::Character('q')) => Some(InputCmd::Quit),
-            Some(pancurses::Input::Character(ASCII_ENTER)) | Some(pancurses::Input::KeyEnter) => {
-                Some(InputCmd::Select)
-            }
+            Some(pancurses::Input::Character(keys::ASCII_ENTER))
+            | Some(pancurses::Input::KeyEnter) => Some(InputCmd::Select),
             _ => None,
         };
 
