@@ -1,5 +1,4 @@
 // Extended work breakdown
-// - put solver in gui screen
 // - async dict load to hide loading times
 // - add timed mode
 // - add extra game rules for handling selecting brackets?
