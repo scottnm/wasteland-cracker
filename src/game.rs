@@ -643,7 +643,7 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
         }
 
         // Render the next frame
-        window.clear();
+        window.erase();
         render_game_window(
             &window,
             &selected_chunk,

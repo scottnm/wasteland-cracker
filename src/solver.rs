@@ -60,7 +60,7 @@ where
     passwords
 }
 
-pub fn solver(password_file: &str, guess_args: &[String]) {
+pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Window) {
     let input_passwords = {
         let pwds: Vec<String> = snm_simple_file::read_lines(&password_file).collect();
         match validate_input_passwords(pwds) {
@@ -93,6 +93,7 @@ pub fn solver(password_file: &str, guess_args: &[String]) {
         remaining_passwords = filter_matching_passwords(&known_guess, remaining_passwords);
     }
 
+    /* FIXME:
     while remaining_passwords.len() > 1 {
         println!("Remaining passwords:");
         for p in &remaining_passwords {
@@ -110,12 +111,34 @@ pub fn solver(password_file: &str, guess_args: &[String]) {
         remaining_passwords = filter_matching_passwords(&next_guess, remaining_passwords);
         known_guesses.push(next_guess);
     }
+    */
 
+    loop {
+        window.erase();
+
+        let word_column_width = remaining_passwords.iter().map(|p| p.len()).max().unwrap() as i32;
+        for (i, pwd) in remaining_passwords.iter().enumerate() {
+            let row = i as i32;
+            window.mvaddstr(row, 0, pwd);
+            window.mvaddstr(row, word_column_width + 4, "__");
+        }
+        let back_button_row = (remaining_passwords.len() + 2) as i32;
+        window.mvaddstr(back_button_row, 0, "[ Back ]");
+
+        window.refresh();
+
+        // No need to waste cycles doing nothing but rendering over and over.
+        // Yield the processor until the next frame.
+        std::thread::sleep(std::time::Duration::from_millis(33));
+    }
+
+    /* FIXME:
     match &remaining_passwords[..] {
         [] => println!("No solution matched the provided guesses!"),
         [solution] => println!("The password is... {}", solution),
         _ => (),
     };
+    */
 }
 
 #[cfg(test)]

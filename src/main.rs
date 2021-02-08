@@ -198,29 +198,18 @@ fn main() {
         Err(err_msg) => print_usage_and_exit(&err_msg),
     };
 
+    let window = utils::setup_pancurses_window(TITLE);
     match args.mode {
-        Mode::LaunchGame(difficulty) => {
-            let window = utils::setup_pancurses_window(TITLE);
-            game::run_game(difficulty, &window);
-            pancurses::endwin();
-        }
+        Mode::LaunchGame(difficulty) => game::run_game(difficulty, &window),
         Mode::LaunchSolver(input_password_file, known_guess_args) => {
-            solver::solver(&input_password_file, &known_guess_args);
+            solver::solver(&input_password_file, &known_guess_args, &window)
         }
-        Mode::LaunchGui => run_full_gui(),
+        Mode::LaunchGui => run_full_gui(&window),
     }
+    pancurses::endwin();
 }
 
-fn run_full_gui() {
-    // setup the window
-    let window = utils::setup_pancurses_window(TITLE);
-    pancurses::noecho(); // prevent key inputs rendering to the screen
-    pancurses::cbreak();
-    pancurses::curs_set(0);
-    pancurses::set_title(TITLE);
-    window.nodelay(true); // don't block waiting for key inputs (we'll poll)
-    window.keypad(true); // let special keys be captured by the program (i.e. esc/backspace/del/arrow keys)
-
+fn run_full_gui(window: &pancurses::Window) {
     // Run the game until we quit
     let mut screen = Screen::StartMenu;
     loop {
@@ -233,7 +222,7 @@ fn run_full_gui() {
             }
             // FIXME: make the input file
             Screen::Solver => {
-                solver::solver("src/input.txt", &Vec::new());
+                solver::solver("src/input.txt", &Vec::new(), &window);
                 Some(Screen::StartMenu)
             }
         };
@@ -244,7 +233,4 @@ fn run_full_gui() {
             None => break,
         }
     }
-
-    // Close the window
-    pancurses::endwin();
 }
