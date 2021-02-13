@@ -1,5 +1,5 @@
-use crate::randwrapper::{select_rand, RangeRng};
-use crate::utils::hamming_dist_ignore_case;
+use crate::utils::rand::{select_rand, RangeRng};
+use crate::utils::str_utils::hamming_dist_ignore_case;
 
 // Each dict chunk represents all words of the same length from our src dict. This partitioning is a
 // quick optimization since the cracker game will only concern itself with words of the same length.
@@ -26,7 +26,7 @@ impl EnglishDictChunk {
     }
 
     pub fn load(word_len: usize) -> Self {
-        let dict_file_name = format!("src/dict/{}_char_words_alpha.txt", word_len);
+        let dict_file_name = format!("assets/dict/{}_char_words_alpha.txt", word_len);
         let word_set = snm_simple_file::read_lines(&dict_file_name).collect();
         EnglishDictChunk { word_len, word_set }
     }

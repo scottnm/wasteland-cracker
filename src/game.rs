@@ -8,12 +8,12 @@
 // - SFX
 // - refactor out tui utils into its own module
 // - improve TUI navigation logic to be more intuitive
-// - refactor different components into modules
 // - address all cleanup/refactoring todos
 
-use crate::dict;
-use crate::randwrapper::{RangeRng, ThreadRangeRng};
-use crate::utils::{keys, matching_char_count_ignore_case, Rect};
+use crate::dict::dict::EnglishDictChunk;
+use crate::utils::rand::{RangeRng, ThreadRangeRng};
+use crate::utils::str_utils::matching_char_count_ignore_case;
+use crate::utils::tui::{ascii_keycodes, Rect};
 
 const MAX_ATTEMPTS: usize = 4;
 
@@ -159,7 +159,7 @@ fn get_word_len_for_difficulty(difficulty: Difficulty) -> usize {
 }
 
 fn generate_words(
-    dict_chunk: &dict::EnglishDictChunk,
+    dict_chunk: &EnglishDictChunk,
     hd_distribution: &[HDDEntry; 4],
     rng: &mut dyn RangeRng<usize>,
 ) -> (Vec<String>, String) {
@@ -214,7 +214,7 @@ fn generate_words_from_difficulty(
     difficulty: Difficulty,
     rng: &mut dyn RangeRng<usize>,
 ) -> (Vec<String>, String) {
-    let dict_chunk = dict::EnglishDictChunk::load(get_word_len_for_difficulty(difficulty));
+    let dict_chunk = EnglishDictChunk::load(get_word_len_for_difficulty(difficulty));
     let hd_distribution = get_hamming_distance_distribution(difficulty);
     generate_words(&dict_chunk, &hd_distribution, rng)
 }
@@ -598,8 +598,8 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
             Some(pancurses::Input::Character('s')) => Some(InputCmd::Move(Movement::Down)),
             Some(pancurses::Input::Character('a')) => Some(InputCmd::Move(Movement::Left)),
             Some(pancurses::Input::Character('d')) => Some(InputCmd::Move(Movement::Right)),
-            Some(pancurses::Input::Character(keys::ASCII_ESC)) => Some(InputCmd::Quit),
-            Some(pancurses::Input::Character(keys::ASCII_ENTER))
+            Some(pancurses::Input::Character(ascii_keycodes::ESC)) => Some(InputCmd::Quit),
+            Some(pancurses::Input::Character(ascii_keycodes::ENTER))
             | Some(pancurses::Input::KeyEnter) => Some(InputCmd::Select),
             _ => None,
         };
@@ -670,12 +670,12 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::randwrapper;
+    use crate::utils::rand::mocks as rand_mocks;
 
     #[test]
     fn test_word_generation() {
         // use a single-value rng for value 0. This will make sure the goal_word is the first word in the original word list
-        let mut rng = randwrapper::mocks::SingleValueRangeRng::new(0);
+        let mut rng = rand_mocks::SingleValueRangeRng::new(0);
 
         let test_hd_distribution = [
             HDDEntry {
@@ -722,7 +722,7 @@ mod tests {
             "sick", "stop", "soil", "roll", // hd 4
         ];
 
-        let test_dict = dict::EnglishDictChunk::new_mock(4, &words);
+        let test_dict = EnglishDictChunk::new_mock(4, &words);
         let (generated_words, solution) =
             generate_words(&test_dict, &test_hd_distribution, &mut rng);
 

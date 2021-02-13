@@ -1,6 +1,6 @@
-use crate::dict;
-
-use crate::utils::{keys, Rect};
+use crate::dict::dict::EnglishDictChunk;
+use crate::utils::str_utils::matching_char_count_ignore_case;
+use crate::utils::tui::{ascii_keycodes, Rect};
 
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
@@ -20,7 +20,7 @@ fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValid
         return Err(InputValidationErr::InvalidPasswordLengthFound);
     }
 
-    let dict = dict::EnglishDictChunk::load(required_len);
+    let dict = EnglishDictChunk::load(required_len);
 
     let all_valid_words = pwds.iter().all(|p| dict.is_word(&p));
     if !all_valid_words {
@@ -53,8 +53,7 @@ where
     S: AsRef<str>,
 {
     for i in (0..passwords.len()).rev() {
-        let matching_count =
-            crate::utils::matching_char_count_ignore_case(passwords[i].as_ref(), &guess.word);
+        let matching_count = matching_char_count_ignore_case(passwords[i].as_ref(), &guess.word);
         if matching_count != guess.char_count {
             passwords.swap_remove(i);
         }
@@ -168,7 +167,7 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
                     refresh_filtered_passwords = true;
                     clear_on_next_number_input = true;
                 }
-                keys::ASCII_ENTER => {
+                ascii_keycodes::ENTER => {
                     if menu_cursor == input_passwords.len() as i32 {
                         break;
                     } else {
@@ -190,13 +189,13 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
                         }
                     }
                 }
-                keys::ASCII_BACKSPACE | keys::ASCII_DEL => {
+                ascii_keycodes::BKSP | ascii_keycodes::DEL => {
                     let menu_idx = menu_cursor as usize;
                     if menu_idx < input_passwords.len() {
                         number_input_buffers[menu_idx].pop();
                     }
                 }
-                keys::ASCII_ESC => break,
+                ascii_keycodes::ESC => break,
                 _ => (),
             }
         };
