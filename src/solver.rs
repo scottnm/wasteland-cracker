@@ -1,4 +1,4 @@
-use crate::dict;
+use crate::dict::dict::EnglishDictChunk;
 
 use crate::utils::{keys, Rect};
 
@@ -20,7 +20,7 @@ fn validate_input_passwords(pwds: Vec<String>) -> Result<Vec<String>, InputValid
         return Err(InputValidationErr::InvalidPasswordLengthFound);
     }
 
-    let dict = dict::EnglishDictChunk::load(required_len);
+    let dict = EnglishDictChunk::load(required_len);
 
     let all_valid_words = pwds.iter().all(|p| dict.is_word(&p));
     if !all_valid_words {

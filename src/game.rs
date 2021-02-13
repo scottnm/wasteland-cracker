@@ -11,7 +11,7 @@
 // - refactor different components into modules
 // - address all cleanup/refactoring todos
 
-use crate::dict;
+use crate::dict::dict::EnglishDictChunk;
 use crate::randwrapper::{RangeRng, ThreadRangeRng};
 use crate::utils::{keys, matching_char_count_ignore_case, Rect};
 
@@ -159,7 +159,7 @@ fn get_word_len_for_difficulty(difficulty: Difficulty) -> usize {
 }
 
 fn generate_words(
-    dict_chunk: &dict::EnglishDictChunk,
+    dict_chunk: &EnglishDictChunk,
     hd_distribution: &[HDDEntry; 4],
     rng: &mut dyn RangeRng<usize>,
 ) -> (Vec<String>, String) {
@@ -214,7 +214,7 @@ fn generate_words_from_difficulty(
     difficulty: Difficulty,
     rng: &mut dyn RangeRng<usize>,
 ) -> (Vec<String>, String) {
-    let dict_chunk = dict::EnglishDictChunk::load(get_word_len_for_difficulty(difficulty));
+    let dict_chunk = EnglishDictChunk::load(get_word_len_for_difficulty(difficulty));
     let hd_distribution = get_hamming_distance_distribution(difficulty);
     generate_words(&dict_chunk, &hd_distribution, rng)
 }
@@ -722,7 +722,7 @@ mod tests {
             "sick", "stop", "soil", "roll", // hd 4
         ];
 
-        let test_dict = dict::EnglishDictChunk::new_mock(4, &words);
+        let test_dict = EnglishDictChunk::new_mock(4, &words);
         let (generated_words, solution) =
             generate_words(&test_dict, &test_hd_distribution, &mut rng);
 
