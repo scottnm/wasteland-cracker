@@ -12,8 +12,8 @@
 // - address all cleanup/refactoring todos
 
 use crate::dict::dict::EnglishDictChunk;
-use crate::randwrapper::{RangeRng, ThreadRangeRng};
-use crate::utils::{keys, matching_char_count_ignore_case, Rect};
+use crate::utils::rand::{RangeRng, ThreadRangeRng};
+use crate::utils::utils::{keys, matching_char_count_ignore_case, Rect};
 
 const MAX_ATTEMPTS: usize = 4;
 
@@ -670,12 +670,12 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::randwrapper;
+    use crate::utils::rand::mocks as rand_mocks;
 
     #[test]
     fn test_word_generation() {
         // use a single-value rng for value 0. This will make sure the goal_word is the first word in the original word list
-        let mut rng = randwrapper::mocks::SingleValueRangeRng::new(0);
+        let mut rng = rand_mocks::SingleValueRangeRng::new(0);
 
         let test_hd_distribution = [
             HDDEntry {

@@ -1,6 +1,5 @@
 use crate::dict::dict::EnglishDictChunk;
-
-use crate::utils::{keys, Rect};
+use crate::utils::utils::{keys, matching_char_count_ignore_case, Rect};
 
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
@@ -53,8 +52,7 @@ where
     S: AsRef<str>,
 {
     for i in (0..passwords.len()).rev() {
-        let matching_count =
-            crate::utils::matching_char_count_ignore_case(passwords[i].as_ref(), &guess.word);
+        let matching_count = matching_char_count_ignore_case(passwords[i].as_ref(), &guess.word);
         if matching_count != guess.char_count {
             passwords.swap_remove(i);
         }

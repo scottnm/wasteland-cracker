@@ -6,11 +6,11 @@ extern crate static_assertions;
 
 mod dict;
 mod game;
-mod randwrapper;
 mod solver;
 mod utils;
 
-use utils::Rect;
+use utils::utils::Rect;
+use utils::utils::{keys, pancurses_green, setup_pancurses_window};
 
 #[derive(Debug)]
 enum Mode {
@@ -142,7 +142,7 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
         // Render the title card
         for (i, title_line) in TITLE_LINES.iter().enumerate() {
             let row_offset = (i as i32) + title_rect.top;
-            let color_pair = utils::pancurses_green();
+            let color_pair = pancurses_green();
             window.attron(color_pair);
             window.mvaddstr(row_offset, title_rect.left, title_line);
             window.attroff(color_pair);
@@ -180,7 +180,7 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
                         menu_cursor + 1
                     }
                 }
-                utils::keys::ASCII_ENTER => return MENU_OPTION_RESULTS[menu_cursor],
+                keys::ASCII_ENTER => return MENU_OPTION_RESULTS[menu_cursor],
                 _ => (),
             }
         };
@@ -198,7 +198,7 @@ fn main() {
         Err(err_msg) => print_usage_and_exit(&err_msg),
     };
 
-    let window = utils::setup_pancurses_window(TITLE);
+    let window = setup_pancurses_window(TITLE);
     match args.mode {
         Mode::LaunchGame(difficulty) => game::run_game(difficulty, &window),
         Mode::LaunchSolver(input_password_file, known_guess_args) => {
@@ -221,7 +221,7 @@ fn run_full_gui(window: &pancurses::Window) {
                 Some(Screen::StartMenu)
             }
             Screen::Solver => {
-                solver::solver("src/input.txt", &Vec::new(), &window);
+                solver::solver("assets/solver/input.txt", &Vec::new(), &window);
                 Some(Screen::StartMenu)
             }
         };
