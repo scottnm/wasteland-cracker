@@ -24,6 +24,7 @@ version = "0.1.0"
 dependencies = [
  "pancurses",
  "rand",
+ "snm_rand_utils",
  "snm_simple_file",
  "static_assertions",
  "text_io",
@@ -150,6 +151,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "16abd0c1b639e9eb4d7c50c0b8100b0d0f849be2349829c740fe8e6eb4816429"
 dependencies = [
  "rand_core",
+]
+
+[[package]]
+name = "snm_rand_utils"
+version = "0.1.0"
+source = "git+https://github.com/scottnm/snm_rand_utils?branch=main#e9d312e9b6a2011fa4ab92b063b6e6859973a368"
+dependencies = [
+ "rand",
 ]
 
 [[package]]
