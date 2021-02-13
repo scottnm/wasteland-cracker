@@ -1,5 +1,5 @@
-use crate::utils::rand::{select_rand, RangeRng};
 use crate::utils::str_utils::hamming_dist_ignore_case;
+use snm_rand_utils::range_rng::{select_rand, RangeRng};
 
 // Each dict chunk represents all words of the same length from our src dict. This partitioning is a
 // quick optimization since the cracker game will only concern itself with words of the same length.
