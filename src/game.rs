@@ -8,7 +8,6 @@
 // - SFX
 // - refactor out tui utils into its own module
 // - improve TUI navigation logic to be more intuitive
-// - refactor different components into modules
 // - address all cleanup/refactoring todos
 
 use crate::dict::dict::EnglishDictChunk;
