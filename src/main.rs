@@ -9,8 +9,9 @@ mod game;
 mod solver;
 mod utils;
 
-use utils::utils::Rect;
-use utils::utils::{keys, pancurses_green, setup_pancurses_window};
+use utils::tui::ascii_keycodes;
+use utils::tui::pancurses as pancurses_utils;
+use utils::tui::Rect;
 
 #[derive(Debug)]
 enum Mode {
@@ -142,7 +143,7 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
         // Render the title card
         for (i, title_line) in TITLE_LINES.iter().enumerate() {
             let row_offset = (i as i32) + title_rect.top;
-            let color_pair = pancurses_green();
+            let color_pair = pancurses_utils::green();
             window.attron(color_pair);
             window.mvaddstr(row_offset, title_rect.left, title_line);
             window.attroff(color_pair);
@@ -180,7 +181,7 @@ fn run_start_menu(window: &pancurses::Window) -> Option<Screen> {
                         menu_cursor + 1
                     }
                 }
-                keys::ASCII_ENTER => return MENU_OPTION_RESULTS[menu_cursor],
+                ascii_keycodes::ENTER => return MENU_OPTION_RESULTS[menu_cursor],
                 _ => (),
             }
         };
@@ -198,7 +199,7 @@ fn main() {
         Err(err_msg) => print_usage_and_exit(&err_msg),
     };
 
-    let window = setup_pancurses_window(TITLE);
+    let window = pancurses_utils::setup_window(TITLE);
     match args.mode {
         Mode::LaunchGame(difficulty) => game::run_game(difficulty, &window),
         Mode::LaunchSolver(input_password_file, known_guess_args) => {

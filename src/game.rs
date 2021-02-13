@@ -13,7 +13,8 @@
 
 use crate::dict::dict::EnglishDictChunk;
 use crate::utils::rand::{RangeRng, ThreadRangeRng};
-use crate::utils::utils::{keys, matching_char_count_ignore_case, Rect};
+use crate::utils::str_utils::matching_char_count_ignore_case;
+use crate::utils::tui::{ascii_keycodes, Rect};
 
 const MAX_ATTEMPTS: usize = 4;
 
@@ -598,8 +599,8 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
             Some(pancurses::Input::Character('s')) => Some(InputCmd::Move(Movement::Down)),
             Some(pancurses::Input::Character('a')) => Some(InputCmd::Move(Movement::Left)),
             Some(pancurses::Input::Character('d')) => Some(InputCmd::Move(Movement::Right)),
-            Some(pancurses::Input::Character(keys::ASCII_ESC)) => Some(InputCmd::Quit),
-            Some(pancurses::Input::Character(keys::ASCII_ENTER))
+            Some(pancurses::Input::Character(ascii_keycodes::ESC)) => Some(InputCmd::Quit),
+            Some(pancurses::Input::Character(ascii_keycodes::ENTER))
             | Some(pancurses::Input::KeyEnter) => Some(InputCmd::Select),
             _ => None,
         };

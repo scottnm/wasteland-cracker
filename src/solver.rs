@@ -1,5 +1,6 @@
 use crate::dict::dict::EnglishDictChunk;
-use crate::utils::utils::{keys, matching_char_count_ignore_case, Rect};
+use crate::utils::str_utils::matching_char_count_ignore_case;
+use crate::utils::tui::{ascii_keycodes, Rect};
 
 #[derive(Debug, PartialEq, Eq)]
 enum InputValidationErr {
@@ -166,7 +167,7 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
                     refresh_filtered_passwords = true;
                     clear_on_next_number_input = true;
                 }
-                keys::ASCII_ENTER => {
+                ascii_keycodes::ENTER => {
                     if menu_cursor == input_passwords.len() as i32 {
                         break;
                     } else {
@@ -188,13 +189,13 @@ pub fn solver(password_file: &str, guess_args: &[String], window: &pancurses::Wi
                         }
                     }
                 }
-                keys::ASCII_BACKSPACE | keys::ASCII_DEL => {
+                ascii_keycodes::BKSP | ascii_keycodes::DEL => {
                     let menu_idx = menu_cursor as usize;
                     if menu_idx < input_passwords.len() {
                         number_input_buffers[menu_idx].pop();
                     }
                 }
-                keys::ASCII_ESC => break,
+                ascii_keycodes::ESC => break,
                 _ => (),
             }
         };

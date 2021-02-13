@@ -1,2 +1,3 @@
 pub mod rand;
-pub mod utils;
+pub mod str_utils;
+pub mod tui;
