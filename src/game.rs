@@ -11,9 +11,9 @@
 // - address all cleanup/refactoring todos
 
 use crate::dict::dict::EnglishDictChunk;
-use crate::utils::rand::{RangeRng, ThreadRangeRng};
 use crate::utils::str_utils::matching_char_count_ignore_case;
 use crate::utils::tui::{ascii_keycodes, Rect};
+use snm_rand_utils::{RangeRng, ThreadRangeRng};
 
 const MAX_ATTEMPTS: usize = 4;
 
@@ -670,7 +670,6 @@ pub fn run_game(difficulty: Difficulty, window: &pancurses::Window) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::rand::mocks as rand_mocks;
 
     #[test]
     fn test_word_generation() {
