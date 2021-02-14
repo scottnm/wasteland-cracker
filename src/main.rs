@@ -1,5 +1,5 @@
 extern crate pancurses;
-extern crate rand;
+extern crate snm_rand_utils;
 extern crate snm_simple_file;
 #[macro_use]
 extern crate static_assertions;
