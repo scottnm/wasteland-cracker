@@ -10,6 +10,5 @@ edition = "2018"
 snm_simple_file = { git = "https://github.com/scottnm/snm_simple_file", branch = "main" }
 text_io = "0.1.8"
 pancurses = "0.16.1"
-rand = { version = "0.7.0", features = ["small_rng"] }
 static_assertions = "1.1.0"
 snm_rand_utils = { git = "https://github.com/scottnm/snm_rand_utils", branch = "main"}
