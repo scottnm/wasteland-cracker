@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 snm_simple_file = { git = "https://github.com/scottnm/snm_simple_file", branch = "main" }
-pancurses = "0.16.1"
+pancurses = "0.17"
 static_assertions = "1.1.0"
 snm_rand_utils = { git = "https://github.com/scottnm/snm_rand_utils", branch = "main"}
